@@ -101,6 +101,8 @@ export function SpacePage({ data, spaceId, brandId = null }: {
       ]}
       node={folderBrand ? `space:${spaceId}:brand:${folderBrand.id}` : `space:${spaceId}`}
       viewTypes={['board', 'sheet', 'calendar']}
+      // The built-in Sheet tab is the Space's workbook, with its own Fields; the page's Fields is for the Board and saved views.
+      builtInFields={['board', 'list']}
       options={viewOptions(data, tasks)}
       fields={fieldsSetup(data, tasks)}
       lead={data.currentUser.access !== 'user'}

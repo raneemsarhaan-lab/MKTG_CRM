@@ -14,6 +14,8 @@ import { applyCommentOps } from '@/actions/sheet-comments'
 import { COMMENT_RECORD, reloadComments } from './format/bus'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { createPortal } from 'react-dom'
+import { useViewChrome } from '@/components/views/view-chrome'
 import { useLocale, useTranslations } from 'next-intl'
 import type { FolderSummary, SheetChanges, SheetDoc, SheetSummary, TabColor } from '@/types/index'
 import { TAB_COLORS } from '@/types/index'
@@ -331,16 +333,23 @@ export function Workbook(p: WorkbookProps) {
   // ── toolbar state ───────────────────────────────────────────────────────
   /** Spec 018: where the title row ends on screen, so the comments panel opens below the Comments button. */
   const topRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Sheet look (25 Nov 2026): inside a page with views, "Saved" sits by the page's title and the tools
+  // (Fields, Comments) at the end of its view tabs row, so the sheet doesn't repeat the page's title.
+  const chrome = useViewChrome()
+  const inChrome = inPage && !phone && !!chrome?.status && !!chrome?.tools
   useEffect(() => {
-    const el = topRef.current
-    if (!el) return
-    const put = () => el.parentElement?.style.setProperty('--fx-sh-top-h', `${Math.max(0, Math.round(el.getBoundingClientRect().bottom))}px`)
+    // The comments panel opens below whatever holds the Comments button: this title row, or the page's tabs row.
+    const el = inChrome ? (chrome!.tools!.closest('header') as HTMLElement | null) ?? chrome!.tools! : topRef.current
+    const root = rootRef.current
+    if (!el || !root) return
+    const put = () => root.style.setProperty('--fx-sh-top-h', `${Math.max(0, Math.round(el.getBoundingClientRect().bottom))}px`)
     put()
     const ro = new ResizeObserver(put)
     ro.observe(el)
     window.addEventListener('scroll', put, true)
     return () => { ro.disconnect(); window.removeEventListener('scroll', put, true) }
-  }, [])
+  }, [inChrome, chrome])
   const [sel, setSel] = useState<{ cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean; stats?: SelStats } | null>(null)
   // ── spec 020: zoom per sheet, the status bar's mode, the custom lists, the Go To / Series / Validation dialogs ──
   const tt = useTranslations('sheets.tips')
@@ -805,8 +814,13 @@ export function Workbook(p: WorkbookProps) {
     </>
   )
   return (
-    <div className="fx-sh-workbook" data-workbook={folder.id} onKeyDownCapture={onKeyDownCapture}>
-      <div className="fx-sh-top" ref={topRef}>
+    <div className={`fx-sh-workbook${inChrome ? ' is-in-chrome' : ''}`} data-workbook={folder.id} onKeyDownCapture={onKeyDownCapture} ref={rootRef}>
+      {inChrome ? <>
+        {createPortal(
+          <span className={`fx-sh-status is-${status}`} data-save-status={status} role="status" aria-live="polite"
+                title={status === 'retrying' ? t('status.offline') : undefined}>{statusText}</span>, chrome!.status!)}
+        {createPortal(<div className="fx-sh-top-tools is-in-tabs">{headTools}</div>, chrome!.tools!)}
+      </> : <div className="fx-sh-top" ref={topRef}>
         <nav className="fx-sh-crumbs" aria-label={t('crumb')} data-crumb="">
           {/* Spec 026: inside a Space, brand or My tasks page there is no Sheets section to go back to. */}
           {!inPage && <><Link href="/sheets">{t('crumb')}</Link><span aria-hidden="true">›</span></>}
@@ -816,7 +830,7 @@ export function Workbook(p: WorkbookProps) {
         <span className={`fx-sh-status is-${status}`} data-save-status={status} role="status" aria-live="polite"
               title={status === 'retrying' ? t('status.offline') : undefined}>{statusText}</span>
         {!phone && <div className="fx-sh-top-tools">{headTools}</div>}
-      </div>
+      </div>}
       {phone && <div className="fx-sh-tools" role="toolbar" aria-label={folderName} ref={toolsRef}>
         <button type="button" className="fx-sh-ib" data-undo="" aria-label={t('toolbar.undoKey')} title={t('toolbar.undoKey')}
                 disabled={openBlank ? !stack || !canUndo(stack) : !linkedHist.canUndo}

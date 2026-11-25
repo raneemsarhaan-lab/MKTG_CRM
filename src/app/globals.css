@@ -3425,3 +3425,29 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
 .fx-fd-seg button:focus-visible, .fx-fd-reset:focus-visible, .fx-fd-search input:focus-visible { outline: 2px solid #6B2BE8; outline-offset: 2px; }
 /* The Add column panel sets its own width; the popover around it follows. */
 .fx-sheet-pop:has(> .fx-ac) { width: auto; padding: 0; }
+
+/* ── Sheet look (user, 25 Nov 2026) ─────────────────────────────────────────────────────────
+   The page header carries the sheet's "Saved" and tools; view tabs carry icons, the open one a soft
+   pill with a thick underline; one formula row with + Column / + Theme; a calmer, roomier grid. */
+.fx-view-status:empty { display: none; }
+.fx-view-status .fx-sh-status { margin-inline-start: 0; font-size: 13px; }
+.fx-view-tab { display: inline-flex; align-items: center; position: relative; border-radius: 10px 10px 0 0; }
+.fx-view-tab::after { content: ""; position: absolute; inset-inline: 6px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: transparent; }
+.fx-view-tab.is-on { background: #F1F3F7; }
+.fx-view-tab.is-on::after { background: #14131A; }
+.fx-view-tab:hover:not(.is-on) { background: #F7F7F9; }
+.fx-view-tab-btn { display: inline-flex; align-items: center; gap: 7px; border: 0; background: none; cursor: pointer; font: 600 13.5px var(--font-body); color: #6B7080; padding: 10px 6px 12px 12px; white-space: nowrap; }
+.fx-view-tab-btn:disabled { cursor: default; color: #B5B8C2; }
+.fx-view-tab.is-on .fx-view-tab-btn { color: #14131A; }
+.fx-view-tab-ic { flex: none; opacity: .85; }
+.fx-view-tab-more { border: 0; background: none; cursor: pointer; color: #9AA0AC; padding: 10px 8px 12px 2px; font-size: 13px; opacity: 0; transition: opacity .12s; }
+.fx-view-tab:hover .fx-view-tab-more, .fx-view-tab.is-on .fx-view-tab-more, .fx-view-tab-more:focus-visible, .fx-view-tab-more[aria-expanded="true"] { opacity: 1; }
+@media (hover: none) { .fx-view-tab-more { opacity: 1; } }
+.fx-view-add { border: 0; background: none; cursor: pointer; font: 700 13.5px var(--font-body); color: #6B7080; padding: 10px 12px 12px; white-space: nowrap; border-radius: 10px 10px 0 0; }
+.fx-view-add:hover { background: #F7F7F9; color: #14131A; }
+.fx-view-tools { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; padding: 0 0 7px; padding-inline-start: 12px; }
+.fx-view-tools-slot { display: contents; }
+.fx-sh-top-tools.is-in-tabs { margin-inline-start: 0; flex-wrap: nowrap; }
+.fx-view-tools .fx-sh-ib.is-text, .fx-view-tools [data-fields-button] { height: 34px; padding: 0 13px; border: 1px solid #E3E5EA; border-radius: 10px; background: #fff; font: 600 13px var(--font-body); color: #14131A; gap: 7px; }
+.fx-view-tools .fx-sh-ib.is-text:hover:not(:disabled) { background: #F7F7F9; }
+.fx-sh-workbook.is-in-chrome .fx-cmt-panel:not(.is-full) { top: var(--fx-sh-top-h, 52px); }

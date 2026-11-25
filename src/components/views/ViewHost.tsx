@@ -22,6 +22,7 @@ import { arrangeTabs, cleanConfig, EMPTY_TAB_PREFS, filterCount, shownFields, VI
 import { deleteView, listViews, reorderViews, saveView, setTabPrefs } from '@/actions/views'
 import { FieldsMenu, type FieldsSetup } from '@/components/fields/FieldsMenu'
 import { STATUS_GROUPS } from '@/lib/status-groups'
+import { ViewChromeContext } from './view-chrome'
 
 export interface ViewTab { key: string; label: string; disabled?: boolean; note?: string }
 export interface OpenView { id: string; type: ViewType; config: ViewConfig }
@@ -49,6 +50,8 @@ interface ViewHostProps {
   render: (tab: string, view?: OpenView, fields?: string[]) => React.ReactNode
   /** Spec 023: the Fields button's custom fields and "+ Field". */
   fields?: FieldsSetup
+  /** The built-in tabs whose view uses the Fields button's choices (default: Board, List and Sheet). A Space's Sheet tab has its own Fields. */
+  builtInFields?: string[]
   /** Saved views: the node they belong to ('space:<id>', 'brand:<id>', 'me'). */
   node?: string
   /** The types "+ View" offers (the page's own view tabs). */
@@ -69,7 +72,11 @@ interface ViewHostProps {
 
 const pill: React.CSSProperties = { border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 9px', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: PIPE.ink, cursor: 'pointer' }
 
-export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs, sections, noViews = false }: ViewHostProps) {
+export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs, sections, noViews = false, builtInFields }: ViewHostProps) {
+  // Sheet look (25 Nov 2026): where a sheet puts its "Saved" and its tools, in this header.
+  const [statusSlot, setStatusSlot] = useState<HTMLElement | null>(null)
+  const [toolsSlot, setToolsSlot] = useState<HTMLElement | null>(null)
+  const chrome = useMemo(() => ({ status: statusSlot, tools: toolsSlot }), [statusSlot, toolsSlot])
   const t = useTranslations('views')
   const params = useSearchParams()
   const [views, setViews] = useState<SavedView[]>([])
@@ -148,7 +155,9 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   // The Fields button (spec 023): a saved view keeps its fields in its config (saved with Save);
   // a built-in tab keeps this member's choice in their tab prefs.
   const viewType = open ? open.type : tab
-  const hasFields = !!fieldSetup && ['board', 'list', 'sheet'].includes(viewType)
+  const hasFields = !!fieldSetup && ['board', 'list', 'sheet'].includes(viewType) && (!!open || !builtInFields || builtInFields.includes(viewType))
+  /** A tab's view type, for its icon: the built-in tab's key, or the saved view's type. */
+  const typeOf = (key: string) => (key.startsWith('v:') ? views.find(v => savedKey(v) === key)?.type : key)
   const shown = hasFields && fieldSetup
     ? shownFields(open ? config?.fields : prefs.fields?.[tab], viewType, fieldSetup.custom, new Set(fieldSetup.typesOnPage), fieldSetup.links)
     : undefined
@@ -160,6 +169,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   }
 
   return (
+    <ViewChromeContext.Provider value={chrome}>
     <div data-view-host style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#FFFFFF' }}>
       <header className="fx-view-head" style={{ padding: '22px 26px 0 38px', display: 'flex', flexDirection: 'column', gap: 10, borderBottom: `1px solid ${PIPE.border}` }}>
         <div data-crumbs style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 12, color: PIPE.textMuted }}>
@@ -171,11 +181,14 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
           ))}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 26, letterSpacing: '-0.02em', color: PIPE.ink }}>
             {color && <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#FFFFFF', fontSize: 12, fontWeight: 800 }}>{mark ?? title[0]}</span>}
             {title}
             <span style={{ fontFamily: 'inherit', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: PIPE.surface, color: PIPE.textSecondary, letterSpacing: 0 }}>{tag}</span>
           </h1>
+          <span ref={setStatusSlot} data-view-status-slot="" className="fx-view-status" />
+          </div>
           {actions && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>{actions}</div>}
         </div>
         {sections}
@@ -184,7 +197,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
           {/* A toolbar of view buttons (each with its ⋯ menu), so the menus sit beside them legitimately. */}
           <div role="toolbar" aria-label={t('tabs')} style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', minWidth: 0 }}>
             {arranged.shown.map(x => (
-              <span key={x.key} style={{ display: 'inline-flex', alignItems: 'center' }} className="fx-view-tab">
+              <span key={x.key} className={`fx-view-tab${tab === x.key ? ' is-on' : ''}`}>
               <button
                 type="button"
                 data-view-tab={x.key}
@@ -193,13 +206,9 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
                 title={x.note}
                 onClick={() => choose(x.key)}
                 onContextMenu={node ? e => { e.preventDefault(); setTabMenu({ key: x.key, x: e.clientX, y: e.clientY }) } : undefined}
-                style={{
-                  border: 'none', background: 'none', cursor: x.disabled ? 'default' : 'pointer', fontFamily: 'inherit',
-                  padding: '9px 6px 11px 12px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
-                  color: tab === x.key ? PIPE.ink : x.disabled ? PIPE.textFaintest : PIPE.textMuted,
-                  borderBottom: `2px solid ${tab === x.key ? PIPE.ink : 'transparent'}`,
-                }}
+                className="fx-view-tab-btn"
               >
+                <ViewIcon type={typeOf(x.key)} />
                 {/* User, 24 Nov 2026: the home view and pinned views carry an icon before their name. */}
                 {prefs.home === x.key && <svg role="img" aria-label={t('homeMark')} data-view-home="" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginInlineEnd: 5, verticalAlign: '-2px' }}><title>{t('homeMark')}</title><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>}
                 {prefs.pinned.includes(x.key) && <svg role="img" aria-label={t('pinnedMark')} data-view-pinned="" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginInlineEnd: 5, verticalAlign: '-2px' }}><title>{t('pinnedMark')}</title><path d="M12 17v5" /><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" /></svg>}
@@ -210,7 +219,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
               {node && !x.disabled && (
                 <button type="button" data-tab-menu={x.key} aria-label={t('tabOptions', { name: x.label })} aria-haspopup="menu"
                   onClick={e => setTabMenu({ key: x.key, ...menuAt(e) })}
-                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: PIPE.textFaint, padding: '9px 6px 11px 0', fontSize: 13, borderBottom: `2px solid ${tab === x.key ? PIPE.ink : 'transparent'}` }}>⋯</button>
+                  className="fx-view-tab-more">⋯</button>
               )}
               </span>
             ))}
@@ -222,16 +231,15 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
             </button>
           )}
           {node && viewTypes?.length ? (
-            <button type="button" data-add-view aria-expanded={adding} onClick={() => setAdding(v => !v)}
-              style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '9px 10px 11px', fontSize: 13, fontWeight: 700, color: PIPE.textMuted, whiteSpace: 'nowrap' }}>
+            <button type="button" data-add-view aria-expanded={adding} onClick={() => setAdding(v => !v)} className="fx-view-add">
               {t('addView')}
             </button>
           ) : null}
-          {hasFields && fieldSetup && shown && (
-            <div style={{ marginInlineStart: 'auto', paddingBottom: 6, paddingInlineStart: 8 }}>
-              <FieldsMenu shown={shown} setup={fieldSetup} onChange={setShown} />
-            </div>
-          )}
+          {/* The right end: the page's Fields (Board, List, a saved view), then what the open sheet puts here (its Fields and Comments). */}
+          <div className="fx-view-tools">
+            {hasFields && fieldSetup && shown && <FieldsMenu shown={shown} setup={fieldSetup} onChange={setShown} />}
+            <span ref={setToolsSlot} data-view-tools-slot="" className="fx-view-tools-slot" />
+          </div>
         </div>
       </header>
       {tabMenu && (() => {
@@ -290,6 +298,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
         {open && config ? render(open.type, { id: open.id, type: open.type, config }, shown) : render(tab, undefined, shown)}
       </div>
     </div>
+    </ViewChromeContext.Provider>
   )
 }
 
@@ -432,4 +441,15 @@ function TabMenu({ at, items, label, onClose }: {
       ))}
     </div>
   )
+}
+
+/** Sheet look (25 Nov 2026): each view tab carries its type's icon. */
+function ViewIcon({ type }: { type?: string }) {
+  const path = type === 'board' ? <><rect x="3" y="4" width="7" height="16" rx="1.5" /><rect x="14" y="4" width="7" height="10" rx="1.5" /></>
+    : type === 'sheet' ? <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M3 15h18M9 4v16" /></>
+    : type === 'calendar' ? <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>
+    : type === 'list' ? <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+    : null
+  if (!path) return null
+  return <svg className="fx-view-tab-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{path}</svg>
 }
