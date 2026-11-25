@@ -1040,7 +1040,12 @@ export interface HoursWeekReport {
 }
 
 /** Spec 021: what the sidebar's Me / Teams / Brands sections need (contracts/routes.md). */
+/** A page a member starred (☆ in the simple sheet header), listed in the sidebar's Favourites. */
+export interface Favourite { href: string; label: string; color?: string | null }
+
 export interface NavTree {
+  /** The pages this member starred, in the order they were added. */
+  favourites?: Favourite[]
   /** Open tasks assigned to me or handed off by me. */
   myOpen: number
   /** My tasks page (user, 2026-11-23): open tasks and to-dos that are mine, and how many are overdue. */

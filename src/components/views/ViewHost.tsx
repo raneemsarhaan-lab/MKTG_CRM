@@ -22,7 +22,22 @@ import { arrangeTabs, cleanConfig, EMPTY_TAB_PREFS, fieldsUsed, filterCount, HAS
 import { deleteView, listViews, reorderViews, saveView, setTabPrefs } from '@/actions/views'
 import { FieldsMenu, type FieldsSetup } from '@/components/fields/FieldsMenu'
 import { STATUS_GROUPS } from '@/lib/status-groups'
-import { ViewChromeContext } from './view-chrome'
+import { ViewChromeContext, type PageAdd } from './view-chrome'
+import { Fragment, type ReactNode } from 'react'
+import Link from 'next/link'
+import { FIELDS_OPEN } from '@/components/sheets/links/FieldsPanel'
+
+/** Simple sheet header (user, 25 Nov 2026): what a page shows in it. */
+export interface SimpleHeader {
+  /** "Spaces / Content / [logo] Forefront": each with its small icon; the last is the page. */
+  crumbs: { label: string; icon: ReactNode; href?: string }[]
+  /** ☆: this page in the member's favourites. */
+  favourite?: { on: boolean; toggle(): void }
+  /** The settings icon's "Space settings" (or the brand's). */
+  settings?: { label: string; open(): void } | null
+  /** "+ Post": the page's own add, its word from the Space's New task label. */
+  add?: PageAdd | null
+}
 
 export interface ViewTab { key: string; label: string; disabled?: boolean; note?: string }
 export interface OpenView { id: string; type: ViewType; config: ViewConfig }
@@ -81,16 +96,18 @@ interface ViewHostProps {
   sections?: React.ReactNode
   /** Spec 025: a section with no views of its own (Assets, Settings): no view tabs. */
   noViews?: boolean
+  /** The simple header, on the Sheet view (built-in or saved) of a Space, folder or brand page. */
+  simple?: SimpleHeader
 }
 
 const pill: React.CSSProperties = { border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 9px', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: PIPE.ink, cursor: 'pointer' }
 
-export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs, sections, noViews = false, builtInFields, fieldPicker }: ViewHostProps) {
+export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs, sections, noViews = false, builtInFields, fieldPicker, simple }: ViewHostProps) {
   // Sheet look (25 Nov 2026): where a sheet puts its "Saved" and its tools, in this header.
   const [statusSlot, setStatusSlot] = useState<HTMLElement | null>(null)
   const [toolsSlot, setToolsSlot] = useState<HTMLElement | null>(null)
-  const chrome = useMemo(() => ({ status: statusSlot, tools: toolsSlot }), [statusSlot, toolsSlot])
   const t = useTranslations('views')
+  const th = useTranslations('views.simple')
   const params = useSearchParams()
   const [views, setViews] = useState<SavedView[]>([])
   const [drafts, setDrafts] = useState<Record<string, ViewConfig>>({})
@@ -163,6 +180,10 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   }, [tab, node, views]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = views.find(v => savedKey(v) === tab) ?? null
+  // The simple header is the Sheet view's (built-in or saved) on the pages that offer it.
+  const isSimple = !!simple && (open ? open.type : tab) === 'sheet' && !noViews
+  const chrome = useMemo(() => ({ status: statusSlot, tools: toolsSlot, simple: isSimple, add: isSimple ? simple?.add ?? null : null }), [statusSlot, toolsSlot, isSimple, simple?.add])
+  const [settingsMenu, setSettingsMenu] = useState<{ x: number; y: number } | null>(null)
   const allTabs: (ViewTab & { personal?: boolean })[] = [...tabs, ...views.map(v => ({ key: savedKey(v), label: v.name, personal: !!v.owner_id }))]
   const arranged = node ? arrangeTabs(allTabs, prefs) : { shown: allTabs, hidden: [] as typeof allTabs }
   function updatePrefs(next: TabPrefs) {
@@ -219,32 +240,9 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
     await reload(tab === savedKey(v) ? live[0]?.key : undefined)
   }
 
-  return (
-    <ViewChromeContext.Provider value={chrome}>
-    <div data-view-host style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#FFFFFF' }}>
-      <header className="fx-view-head" style={{ padding: '22px 26px 0 38px', display: 'flex', flexDirection: 'column', gap: 10, borderBottom: `1px solid ${PIPE.border}` }}>
-        <div data-crumbs style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 12, color: PIPE.textMuted }}>
-          {crumbs.map((c, i) => (
-            <span key={i} style={{ display: 'inline-flex', gap: 6 }}>
-              {i > 0 && <span aria-hidden="true">›</span>}
-              <span style={i === crumbs.length - 1 ? { color: PIPE.ink, fontWeight: 700 } : undefined}>{c}</span>
-            </span>
-          ))}
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flexWrap: 'wrap' }}>
-          <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 26, letterSpacing: '-0.02em', color: PIPE.ink }}>
-            {color && <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#FFFFFF', fontSize: 12, fontWeight: 800 }}>{mark ?? title[0]}</span>}
-            {title}
-            <span style={{ fontFamily: 'inherit', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: PIPE.surface, color: PIPE.textSecondary, letterSpacing: 0 }}>{tag}</span>
-          </h1>
-          <span ref={setStatusSlot} data-view-status-slot="" className="fx-view-status" />
-          </div>
-          {actions && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>{actions}</div>}
-        </div>
-        {sections}
-        {sub && <div data-sub style={{ fontSize: 12.5, color: PIPE.textSecondary, paddingBottom: noViews ? 12 : 0 }}>{sub}</div>}
-        <div hidden={noViews} style={{ display: noViews ? 'none' : 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+  // The view tabs: Board · Sheet · Calendar | + View, the same row in either header.
+  const tabsRow = (
+        <div hidden={noViews} className={isSimple ? 'fx-sh2' : undefined} style={{ display: noViews ? 'none' : 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
           {/* A toolbar of view buttons (each with its ⋯ menu), so the menus sit beside them legitimately. */}
           <div role="toolbar" aria-label={t('tabs')} style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', minWidth: 0 }}>
             {arranged.shown.map(x => (
@@ -291,18 +289,91 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
               {t('hiddenViews', { n: arranged.hidden.length })} ▾
             </button>
           )}
+          {isSimple && <span aria-hidden="true" className="fx-sh2-sep" />}
           {node && viewTypes?.length ? (
             <button type="button" data-add-view aria-expanded={adding} onClick={() => setAdding(v => !v)} className="fx-view-add">
               {t('addView')}
             </button>
           ) : null}
           {/* The right end: the page's Fields (Board, List, a saved view), then what the open sheet puts here (its Fields and Comments). */}
-          <div className="fx-view-tools">
+          {!isSimple && <div className="fx-view-tools">
             {hasFields && fieldSetup && shown && <FieldsMenu shown={shown} setup={fieldSetup} onChange={setShown} />}
             <span ref={setToolsSlot} data-view-tools-slot="" className="fx-view-tools-slot" />
-          </div>
+          </div>}
         </div>
+  )
+
+  return (
+    <ViewChromeContext.Provider value={chrome}>
+    <div data-view-host style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#FFFFFF' }}>
+      {isSimple && simple ? (
+        <header className="fx-simple-head" data-simple-head="">
+          <div className="fx-sh1">
+            <nav aria-label={th('crumbs')} className="fx-sh1-crumbs" data-crumbs="">
+              {simple.crumbs.map((c, i) => {
+                const here = i === simple.crumbs.length - 1
+                return (
+                  <Fragment key={i}>
+                    {i > 0 && <span aria-hidden="true" className="fx-sh1-sep">/</span>}
+                    <span className={`fx-sh1-crumb${here ? ' is-here' : ''}`} aria-current={here ? 'page' : undefined}>
+                      {c.icon}
+                      {c.href && !here ? <Link href={c.href}>{c.label}</Link> : <span>{c.label}</span>}
+                    </span>
+                  </Fragment>
+                )
+              })}
+              {simple.favourite && (
+                <button type="button" className={`fx-sh1-star${simple.favourite.on ? ' is-on' : ''}`} data-favourite="" aria-pressed={simple.favourite.on}
+                  aria-label={simple.favourite.on ? th('unfavourite') : th('favourite')} title={simple.favourite.on ? th('unfavourite') : th('favourite')}
+                  onClick={() => simple.favourite!.toggle()}>
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill={simple.favourite.on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z" /></svg>
+                </button>
+              )}
+            </nav>
+            <span ref={setStatusSlot} data-view-status-slot="" className="fx-view-status fx-sh1-saved" />
+            <span className="fx-sh1-gap" />
+            <button type="button" className="fx-sh1-icon" data-page-settings="" aria-haspopup="menu" aria-expanded={!!settingsMenu}
+              aria-label={th('settings')} title={th('settings')}
+              onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setSettingsMenu(m => (m ? null : { x: r.right - 220, y: r.bottom + 4 })) }}>
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
+            </button>
+          </div>
+          {sections}
+          {tabsRow}
+        </header>
+      ) : (
+      <header className="fx-view-head" style={{ padding: '22px 26px 0 38px', display: 'flex', flexDirection: 'column', gap: 10, borderBottom: `1px solid ${PIPE.border}` }}>
+        <div data-crumbs style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 12, color: PIPE.textMuted }}>
+          {crumbs.map((c, i) => (
+            <span key={i} style={{ display: 'inline-flex', gap: 6 }}>
+              {i > 0 && <span aria-hidden="true">›</span>}
+              <span style={i === crumbs.length - 1 ? { color: PIPE.ink, fontWeight: 700 } : undefined}>{c}</span>
+            </span>
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flexWrap: 'wrap' }}>
+          <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 26, letterSpacing: '-0.02em', color: PIPE.ink }}>
+            {color && <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#FFFFFF', fontSize: 12, fontWeight: 800 }}>{mark ?? title[0]}</span>}
+            {title}
+            <span style={{ fontFamily: 'inherit', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: PIPE.surface, color: PIPE.textSecondary, letterSpacing: 0 }}>{tag}</span>
+          </h1>
+          <span ref={setStatusSlot} data-view-status-slot="" className="fx-view-status" />
+          </div>
+          {actions && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>{actions}</div>}
+        </div>
+        {sections}
+        {sub && <div data-sub style={{ fontSize: 12.5, color: PIPE.textSecondary, paddingBottom: noViews ? 12 : 0 }}>{sub}</div>}
+        {tabsRow}
       </header>
+      )}
+      {settingsMenu && (
+        <TabMenu at={settingsMenu} label={th('settings')} onClose={() => setSettingsMenu(null)}
+          items={[
+            { key: 'fields', label: th('fields'), run: () => { setSettingsMenu(null); document.dispatchEvent(new CustomEvent(FIELDS_OPEN)) } },
+            ...(simple?.settings ? [{ key: 'settings', label: simple.settings.label, run: () => { setSettingsMenu(null); simple.settings!.open() } }] : []),
+          ]} />
+      )}
       {tabMenu && (() => {
         const k = tabMenu.key
         const pinned = prefs.pinned.includes(k)

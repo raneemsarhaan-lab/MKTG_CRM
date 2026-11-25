@@ -18,6 +18,8 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import { TaskSheet } from './TaskSheet'
 import { NodeWorkbook } from './NodeWorkbook'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
+import { BrandMark, BrandsIcon, useFavourite } from './simple-head'
+import { useRouter } from 'next/navigation'
 import { applyView, cleanTabPrefs, isFieldViewKey } from '@/lib/view-config'
 import { useFieldView } from './useFieldView'
 import { isLinkedMedia } from '@/lib/media'
@@ -93,6 +95,15 @@ export function BrandPage({ data, brandId, folder }: {
   const admin = data.currentUser.access === 'admin'
   const section = folder === 'assets' ? 'assets' as const : folder === 'settings' ? 'settings' as const : 'brand' as const
   const sections = brandId ? <BrandSections brandId={brandId} current={section} admin={admin} /> : undefined
+  // Simple sheet header (user, 25 Nov 2026): Brands / [logo] Forefront ☆ and the settings icon.
+  const router = useRouter()
+  const fav = useFavourite({ href: brandId ? `/brands/${brandId}` : '/brands/none', label: name, color: brand?.color ?? null }, data.favourites)
+  const simple = brandId && brand ? {
+    crumbs: [{ label: t('brands'), icon: <BrandsIcon /> }, { label: brand.short_name?.trim() || name, icon: <BrandMark brand={brand} /> }],
+    favourite: fav,
+    settings: admin ? { label: t('tabSettings'), open: () => router.push(`/brands/${brandId}/settings`) } : null,
+    add: null,
+  } : undefined
   const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0], actions: undefined as React.ReactNode, sections }
 
   if (folder === 'assets' && brandId) {
@@ -121,7 +132,7 @@ export function BrandPage({ data, brandId, folder }: {
     )
   }
   return (
-    <ViewHost {...common} title={name} tag={t('brandTag')} sub={t('brandAll')}
+    <ViewHost {...common} simple={simple} title={name} tag={t('brandTag')} sub={t('brandAll')}
       tabs={[{ key: 'board', label: tv('board') }, { key: 'sheet', label: tv('sheet') }, { key: 'calendar', label: tv('calendar') }, { key: 'list', label: tv('list') }, { key: 'workload', label: tv('workload') }]}
       node={brandId ? `brand:${brandId}` : undefined}
       initialPrefs={brandId ? cleanTabPrefs(data.viewPrefs[`brand:${brandId}`]) : undefined}

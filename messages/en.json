@@ -262,7 +262,9 @@
       "label": "View",
       "board": "Board",
       "sheet": "Sheet",
-      "content": "Content"
+      "content": "Content",
+      "moreAdd": "More to add",
+      "addSolo": "Add"
     },
     "sets": {
       "label": "Columns",
@@ -853,7 +855,8 @@
       "more": "Showing {shown} of {n}. All {n} are added.",
       "discardAsk": "Close and lose the pasted rows and your fixes?",
       "keepEditing": "Keep editing",
-      "discard": "Close without adding"
+      "discard": "Close without adding",
+      "open": "Paste plan"
     },
     "problem": {
       "noTitle": "No title",
@@ -3028,6 +3031,11 @@
         "board_tab": "The Board tab is always linked."
       },
       "space": "Board of"
+    },
+    "bar": {
+      "label": "Sheet toolbar",
+      "theme": "Theme",
+      "formatting": "Formatting"
     }
   },
   "hours": {
@@ -3419,7 +3427,8 @@
     "settingsSub": "How this brand's work is set up. Admins only.",
     "workbookSlow": "This sheet is taking too long to open.",
     "workbookRetry": "Try again",
-    "boardTab": "Board"
+    "boardTab": "Board",
+    "favourites": "Favourites"
   },
   "views": {
     "list": "List",
@@ -3521,7 +3530,18 @@
     "rename": "Rename",
     "duplicate": "Duplicate",
     "copyName": "{name} (copy)",
-    "deleteConfirm": "Delete the view “{name}”? Its tasks aren't touched."
+    "deleteConfirm": "Delete the view “{name}”? Its tasks aren't touched.",
+    "simple": {
+      "crumbs": "Breadcrumb",
+      "favourite": "Add to favourites",
+      "unfavourite": "Remove from favourites",
+      "settings": "Settings",
+      "fields": "Fields",
+      "search": "Search",
+      "searchPlaceholder": "Search tasks…",
+      "mine": "Only my tasks",
+      "mineOn": "Mine"
+    }
   },
   "calendar": {
     "today": "Today",

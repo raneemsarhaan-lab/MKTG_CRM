@@ -114,10 +114,14 @@ export function buildContentRows(tasks: Task[], themesIn: ContentTheme[], o: Con
   /** A board task that is a row of its own (clips follow their video). */
   const ownRow = (t: Task) => !(t.parent_task_id && boardVideos?.has(t.parent_task_id))
   const placed = new Set<string>()
+  // A board task whose sheet row sits under another theme shows there only (e.g. a converted clip with
+  // no theme of its own whose row is under "Videos · Forefront"), never a second time as a row of its own.
+  const rowTheme = new Map(recs.filter(r => r.task_id).map(r => [r.task_id!, r.project_id]))
+  const elsewhere = (t: Task, themeId: string) => rowTheme.has(t.id) && rowTheme.get(t.id) !== themeId
   for (const theme of themes) {
     const pieces = o.boardTasks
       // The "No theme" group (TAB_ROWS_ID) takes the board's tasks that have no theme at all.
-      ? [...new Map([...piecesIn(tasks, theme.id, o.recs).filter(t => !hidden(t.id)), ...o.boardTasks.filter(t => (theme.id === TAB_ROWS_ID ? !t.project_id : t.project_id === theme.id) && ownRow(t))].map(t => [t.id, t])).values()]
+      ? [...new Map([...piecesIn(tasks, theme.id, o.recs).filter(t => !hidden(t.id)), ...o.boardTasks.filter(t => (theme.id === TAB_ROWS_ID ? !t.project_id : t.project_id === theme.id) && ownRow(t) && !elsewhere(t, theme.id))].map(t => [t.id, t])).values()]
       : piecesIn(tasks, theme.id, o.recs)
     for (const t of pieces) placed.add(t.id)
     const mineRecs = recs.filter(r => r.project_id === theme.id && (!r.task_id || !hidden(r.task_id)))

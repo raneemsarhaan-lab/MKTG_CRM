@@ -8,6 +8,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import type { NavTree } from '@/types/index'
+import { cleanFavourites } from '@/lib/favourites'
 import { stagesHeldBy } from '@/lib/my-tasks'
 import { cairoToday } from '@/lib/due-dates'
 import { inRange, resolveSettings } from '@/lib/space-settings'
@@ -43,6 +44,7 @@ export async function loadNavTree(member: NavMember): Promise<NavTree> {
     prisma.todo.count({ where: { owner_id: member.id, done_at: null, day: { lt: today } } }),
     prisma.notification.count({ where: { recipient_id: member.id, read_at: null } }).catch(() => 0),
   ])
+  const favourites = cleanFavourites((await prisma.member.findUnique({ where: { id: member.id }, select: { favourites: true } }).catch(() => null))?.favourites)
   const late = (t: { due_date: Date | null }) => !!t.due_date && t.due_date < today
   type N = { open: number; overdue: number }
   const add = (n: N, t: { due_date: Date | null }) => { n.open++; if (late(t)) n.overdue++ }
@@ -71,6 +73,7 @@ export async function loadNavTree(member: NavMember): Promise<NavTree> {
     myOpen: mine,
     myTasks: { open: mtOpen + tdOpen, overdue: mtLate + tdLate },
     inboxUnread: unread,
+    favourites,
     spaces: spaces.map(sp => {
       const x = info.get(sp.id)!
       return {

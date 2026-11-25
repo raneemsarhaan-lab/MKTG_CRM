@@ -203,7 +203,9 @@ export function useMediaLinks({ tasks, onOpenTask, say }: {
 }
 
 /** A media board's Create task (spec 022 FR-004): an unlinked media task at Ready For Design. */
-export function MediaCreateButton({ board, boardName, brands, label }: { board: MediaBoard; boardName: string; brands: { id: string; name: string }[]; /** Spec 024: the Space's own text for the button. */ label?: string }) {
+export function MediaCreateButton({ board, boardName, brands, label, split = false }: { board: MediaBoard; boardName: string; brands: { id: string; name: string }[]; /** Spec 024: the Space's own text for the button. */ label?: string
+  /** The simple sheet header's "+ Post ▾": the left half of the split button. */
+  split?: boolean }) {
   const t = useTranslations('media')
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -221,8 +223,8 @@ export function MediaCreateButton({ board, boardName, brands, label }: { board: 
   }
   return (
     <>
-      <button type="button" data-media-create-open="" onClick={() => setOpen(true)}
-              style={{ border: 'none', background: '#14131A', color: '#FFFFFF', borderRadius: 9, padding: '6px 12px', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+      <button type="button" data-media-create-open="" onClick={() => setOpen(true)} className={split ? 'fx-sheetbar-addmain' : undefined}
+              style={split ? undefined : { border: 'none', background: '#14131A', color: '#FFFFFF', borderRadius: 9, padding: '6px 12px', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
         ＋ {label ?? t('createOnBoard')}
       </button>
       {open && (

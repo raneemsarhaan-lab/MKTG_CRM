@@ -12,6 +12,7 @@ import { fieldOnIn } from '@/lib/field-catalog'
 import { useMediaLinks } from '@/components/media/MediaLinks'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useSheetBar, useViewChrome } from '@/components/views/view-chrome'
 import { useTranslations } from 'next-intl'
 import type { ContentTheme, LinkRole, StageId, Task } from '@/types/index'
 import { SheetMenu, SheetPopover, type MenuItem } from '@/components/sheet/SheetMenu'
@@ -684,6 +685,11 @@ export function ContentSheet(p: ContentSheetProps) {
   // Sheet look: the workbook's formula bar offers a place for + Column and + Theme.
   const sheetRootRef = useRef<HTMLDivElement>(null)
   const [fbarSlot, setFbarSlot] = useState<HTMLElement | null>(null)
+  // Simple sheet header (25 Nov 2026): "+ Post ▾" in the workbook's toolbar row — the page's own add, and
+  // ▾ for + Theme, + Column and Paste plan (and + Add existing task in an added tab).
+  const sheetBar = useSheetBar()
+  const pageChrome = useViewChrome()
+  const [addMenu, setAddMenu] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => { setFbarSlot(sheetRootRef.current?.closest('[data-workbook]')?.querySelector<HTMLElement>('[data-fbar-slot]') ?? null) }, [])
   const linkLabel = (col: LinkCol) => t(`links.${col}`)
 
@@ -693,7 +699,35 @@ export function ContentSheet(p: ContentSheetProps) {
           own controls. Pipeline | Content are the header's tabs now. */}
       {/* Sheet look (25 Nov 2026): + Column and + Theme sit at the end of the workbook's formula bar; on their
           own row only where there is none (outside a workbook). */}
-      {(() => {
+      {sheetBar?.add && createPortal(
+        pageChrome?.add
+          ? <span className="fx-sheetbar-split" data-sheet-add="">
+              {pageChrome.add.node
+                ? pageChrome.add.node
+                : <button type="button" className="fx-sheetbar-addmain" data-sheet-add-main="" onClick={() => pageChrome.add?.onClick?.()}>＋ {pageChrome.add.label}</button>}
+              <button type="button" className="fx-sheetbar-addmore" data-sheet-add-more="" aria-haspopup="menu" aria-expanded={!!addMenu}
+                aria-label={ts('view.moreAdd')} title={ts('view.moreAdd')} onClick={e => setAddMenu(m => (m ? null : e.currentTarget))}>▾</button>
+            </span>
+          // No page add here (a Brand page, or no right to add): one "+ Add ▾" for the same menu.
+          : <span className="fx-sheetbar-split is-solo" data-sheet-add="">
+              <button type="button" className="fx-sheetbar-addmain" data-sheet-add-more="" aria-haspopup="menu" aria-expanded={!!addMenu}
+                onClick={e => setAddMenu(m => (m ? null : e.currentTarget))}>＋ {ts('view.addSolo')} <span aria-hidden="true">▾</span></button>
+            </span>,
+        sheetBar.add)}
+      {addMenu && (
+        <SheetMenu anchor={addMenu} label={ts('view.moreAdd')} onClose={() => setAddMenu(null)}
+          items={[
+            ...(admin ? [{ key: 'theme', text: t('addTheme'), label: t('addTheme'), onSelect: () => {
+              const el = addMenu; setAddMenu(null)
+              if (rowsOn) { void openThemeAdd(el); return }
+              setPopup({ kind: 'name', anchor: el, title: t('theme.newName'), save: async name => { const r = await p.api.addTheme(name); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null } })
+            } }] : []),
+            { key: 'column', text: ts('columns.add'), label: ts('columns.add'), onSelect: () => { const el = addMenu; setAddMenu(null); openAddColumn(el) } },
+            { key: 'paste', text: t('paste.open'), label: t('paste.open'), onSelect: () => { setAddMenu(null); setPaste({ cells: null }) } },
+            ...(p.tab && p.api.addExistingTasks ? [{ key: 'existing', text: t('rows.addExisting'), label: t('rows.addExisting'), onSelect: () => { const el = addMenu; setAddMenu(null); setPopup({ kind: 'addExisting', anchor: el }) } }] : []),
+          ] as MenuItem[]} />
+      )}
+      {!sheetBar && (() => {
         const buttons = (
           <>
         {/* User, 24 Nov 2026: the toolbar keeps + Column and + Theme only. The Fields button above opens

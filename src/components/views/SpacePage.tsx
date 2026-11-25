@@ -34,6 +34,9 @@ import { applyView, cleanTabPrefs, isFieldViewKey } from '@/lib/view-config'
 import { fieldOnIn } from '@/lib/field-catalog'
 import { isLinkedMedia } from '@/lib/media'
 import { MediaCreateButton } from '@/components/media/MediaLinks'
+import { SpaceSettingsPanel } from '@/components/spaces/SpaceSettings'
+import { BrandMark, SpaceIcon, SpacesIcon, useFavourite } from './simple-head'
+import { useState as useStateSH } from 'react'
 
 const brandShort = (b: { name: string; short_name?: string | null }) => b.short_name?.trim() || b.name
 
@@ -85,8 +88,29 @@ export function SpacePage({ data, spaceId, brandId = null }: {
       spaceId={spaceId} spaceAssignees={{ [spaceId]: defaultAssigneeFor(space, data.members, memberIds) }} dueRule={data.dueRule} />
   )
 
+  // Simple sheet header (user, 25 Nov 2026): Spaces / Content / [logo] Forefront ☆, the settings icon, "+ Post".
+  const [settingsOpen, setSettingsOpen] = useStateSH(false)
+  const fav = useFavourite({ href: folderBrand ? `/spaces/${space.key}/${folderBrand.id}` : `/spaces/${space.key}`, label: folderBrand ? `${label} · ${brandShort(folderBrand)}` : label, color: folderBrand?.color ?? space.color }, data.favourites)
+  const simple = {
+    crumbs: [
+      { label: t('teams'), icon: <SpacesIcon /> },
+      { label, icon: <SpaceIcon />, href: folderBrand ? `/spaces/${space.key}` : undefined },
+      ...(folderBrand ? [{ label: brandShort(folderBrand), icon: <BrandMark brand={folderBrand} /> }] : []),
+    ],
+    favourite: fav,
+    settings: data.currentUser.access !== 'user' ? { label: t('config.open'), open: () => setSettingsOpen(true) } : null,
+    add: mayCreate
+      ? (space.media_board
+        ? { label: addLabel, node: <MediaCreateButton board={space.media_board} boardName={space.name} brands={data.brands} label={addLabel} split /> }
+        : { label: addLabel, onClick: () => setShowTaskForm(true) })
+      : null,
+  }
+
   return (
+    <>
+    {settingsOpen && <SpaceSettingsPanel space={space} data={data} onClose={() => setSettingsOpen(false)} />}
     <ViewHost
+      simple={simple}
       crumbs={folderBrand ? [t('teams'), label, brandShort(folderBrand)] : [t('teams'), label]}
       title={folderBrand ? `${label} · ${brandShort(folderBrand)}` : label}
       tag={folderBrand ? t('folderTag') : t('spaceTag')}
@@ -131,7 +155,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
             initialGroup={view && !isFieldViewKey(view.config.group) ? view.config.group : null} fieldGroups={view ? fv.groupsFor(view.config, shownTasks) : null} />
           <TaskPanel data={data} spaceId={spaceId} />{taskForm}
         </>
-        if (tab === 'sheet') return (
+        if (tab === 'sheet') return (<>
           <NodeWorkbook key={view?.id} data={data} brandId={brandId} {...(space.key === 'content' || space.key === 'video' ? { folder: space.key as 'content' | 'video' } : { node: `space:${spaceId}` })}
             linked={<KanbanBoard {...data} surface="sheets" sheetsView="content" scopeTasks={inView} spaceId={spaceId}
               themeScope={themeScope} sheetBrandId={brandId} narrowed={!!view} />}
@@ -139,12 +163,14 @@ export function SpacePage({ data, spaceId, brandId = null }: {
             spaceId={spaceId}
             rowsTab={s => <KanbanBoard {...data} surface="sheets" sheetsView="content" spaceId={spaceId} sheetBrandId={brandId}
               tabSheet={{ id: s.id, linked: !!s.linked, spaceId: s.spaceId ?? spaceId }} />} />
-        )
+          {taskForm}
+        </>)
         const body = <CalendarView tasks={shownTasks} brands={data.brands} colorBy={folderBrand ? 'stage' : 'brand'} statusName={statusName} onOpen={open}
               milestones={{ list: data.milestones, brandIds: [...new Set(shownTasks.map(x => x.brand_id).filter(Boolean))] as string[], canEdit: data.currentUser.access !== 'user' }}
               link={board ? undefined : { spaceId, media: viewTasks(data) }} />
         return <>{body}<TaskPanel data={data} spaceId={spaceId} />{taskForm}</>
       }}
     />
+    </>
   )
 }

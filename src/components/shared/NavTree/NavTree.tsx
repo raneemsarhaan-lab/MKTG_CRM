@@ -25,8 +25,8 @@ import { spaceLabel } from './labels'
 const KEY = 'momentum.sidebar.collapsed'
 const OPEN_KEY = 'momentum.sidebar.spaces'
 
-type Section = 'mywork' | 'spaces' | 'brands'
-const SECTIONS: Section[] = ['mywork', 'spaces', 'brands']
+type Section = 'favourites' | 'mywork' | 'spaces' | 'brands'
+const SECTIONS: Section[] = ['favourites', 'mywork', 'spaces', 'brands']
 
 export function NavTree({ tree, pathname, phone = false }: { tree: NavTreeData; pins?: PinnedFolder[]; pathname: string; phone?: boolean }) {
   const t = useTranslations('spaces')
@@ -115,6 +115,14 @@ export function NavTree({ tree, pathname, phone = false }: { tree: NavTreeData; 
 
   return (
     <div data-nav-tree style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      {/* Simple sheet header (25 Nov 2026): the pages this member starred with ☆. */}
+      {(tree.favourites?.length ?? 0) > 0 && header('favourites', t('favourites'))}
+      {(tree.favourites?.length ?? 0) > 0 && !collapsed.includes('favourites') && tree.favourites!.map(f => (
+        <Link key={f.href} href={f.href} data-node="favourite" data-favourite-link={f.href} style={row(isOn(f.href.split('?')[0], true))} aria-current={isOn(f.href.split('?')[0], true) ? 'page' : undefined}>
+          {icon(<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z" />)}
+          {name(f.label)}
+        </Link>
+      ))}
       {header('mywork', t('myWork'))}
       {!collapsed.includes('mywork') && (
         <>

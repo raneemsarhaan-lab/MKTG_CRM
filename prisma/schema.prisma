@@ -33,6 +33,8 @@ model Member {
   /// Fields (25 Nov 2026): this person's own column layout per sheet view — { "<view key>": { cols: [keys shown, in order], widths: { key: px } } }.
   /// A view with no entry shows the Space's default columns.
   sheet_layouts   Json      @default("{}")
+  /// Simple sheet header (25 Nov 2026): the pages this member starred (☆), shown at the top of the sidebar.
+  favourites      Json      @default("[]")
   /// Each board's sort for this member, by board key ({ "board": "priority" }). Missing means due date.
   board_sorts     Json      @default("{}")
   /// Spec 006: Week Momentum and Daily Spark are shown on the Board.

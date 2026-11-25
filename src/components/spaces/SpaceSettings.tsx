@@ -46,7 +46,7 @@ export function SpaceSettingsButton({ space, data }: { space: TeamSpace; data: B
   )
 }
 
-function SpaceSettingsPanel({ space, data, onClose }: { space: TeamSpace; data: BoardData; onClose(): void }) {
+export function SpaceSettingsPanel({ space, data, onClose }: { space: TeamSpace; data: BoardData; onClose(): void }) {
   const t = useTranslations('spaces.config')
   const locale = useLocale()
   const router = useRouter()

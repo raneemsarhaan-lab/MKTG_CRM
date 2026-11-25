@@ -28,6 +28,9 @@ import { setLinkedRowHeights } from '@/actions/sheets'
 import { addPlan, addPiece, updatePiece, setPieceLink, addTheme, saveTheme, savePillar, removePillar } from '@/actions/content'
 import * as contentRows from '@/actions/content-rows'
 import * as sheetTabs from '@/actions/sheet-tabs'
+import { createPortal } from 'react-dom'
+import { useSheetBar } from '@/components/views/view-chrome'
+import { SheetBarSearch, SheetBarMine } from '@/components/views/SheetBarControls'
 import { TAB_ROWS_ID } from '@/components/content/rows'
 import { tabSheetId } from '@/lib/tab-rows'
 /** Spec 027: the "no theme" group of an added tab stands for no project. */
@@ -267,6 +270,8 @@ function KanbanBoardInner({
    */
   /** Spec 027 (US2): the page this board is on (a Space or brand), for the choices its views share. */
   const pageKey = boardKey ?? spaceId ?? null
+  // Simple sheet header (25 Nov 2026): the workbook's toolbar row, where this sheet's Search, Filters and Mine go.
+  const sheetBar = useSheetBar()
   const [filters, setFilters] = useState<BoardFilterState>(() =>
     filtersFromParams(surface === 'sheets' ? new URLSearchParams() : searchParams))
 
@@ -1370,7 +1375,13 @@ function KanbanBoardInner({
     return (
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
         {!embedded && !hosted && header}
-        {boardTab && (
+        {sheetBar?.tools && createPortal(
+          <span className="fx-sheetbar-own" data-board-tab-filters="">
+            <SheetBarSearch value={filters.search} onChange={v => setFilters(f => ({ ...f, search: v }))} />
+            {boardTab && <span className="fx-sheetbar-filters"><FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} /></span>}
+            {boardTab && <SheetBarMine me={currentUser} on={scope === 'me'} onToggle={() => chooseScope(scope === 'me' ? 'team' : 'me')} />}
+          </span>, sheetBar.tools)}
+        {boardTab && !sheetBar && (
           <div className="fx-board-tab-bar" data-board-tab-filters="">
             <BoardToolbar
               scope={scope} onScope={chooseScope} brands={brands}

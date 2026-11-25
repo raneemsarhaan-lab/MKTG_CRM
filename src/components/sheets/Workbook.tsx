@@ -15,7 +15,7 @@ import { COMMENT_RECORD, reloadComments } from './format/bus'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
-import { useViewChrome } from '@/components/views/view-chrome'
+import { useViewChrome, SheetBarContext } from '@/components/views/view-chrome'
 import { useLocale, useTranslations } from 'next-intl'
 import type { FolderSummary, SheetChanges, SheetDoc, SheetSummary, TabColor } from '@/types/index'
 import { TAB_COLORS } from '@/types/index'
@@ -361,10 +361,22 @@ export function Workbook(p: WorkbookProps) {
   // Sheet look (25 Nov 2026): inside a page with views, "Saved" sits by the page's title and the tools
   // (Fields, Comments) at the end of its view tabs row, so the sheet doesn't repeat the page's title.
   const chrome = useViewChrome()
-  const inChrome = inPage && !phone && !!chrome?.status && !!chrome?.tools
+  // Simple sheet header (user, 25 Nov 2026): one toolbar row here — Theme · Comments, Search, Filters,
+  // Mine, Aa · + Post ▾ — and "Aa" shows or hides the menus, formatting toolbar and formula bar together.
+  const simple = inPage && !phone && !!chrome?.simple && !!chrome?.status
+  const inChrome = inPage && !phone && !!chrome?.status && (!!chrome?.tools || simple)
+  const barRef = useRef<HTMLDivElement>(null)
+  const [barTools, setBarTools] = useState<HTMLElement | null>(null)
+  const [barAdd, setBarAdd] = useState<HTMLElement | null>(null)
+  const sheetBar = useMemo(() => (simple ? { tools: barTools, add: barAdd } : null), [simple, barTools, barAdd])
+  /** "Aa": the full spreadsheet tools shown, each person's own choice (on this device). */
+  const aaKey = `momentum.sheet.aa.${p.me.id}`
+  const [aa, setAa] = useState(true)
+  useEffect(() => { try { const v = localStorage.getItem(aaKey); if (v === '0') setAa(false) } catch { /* private mode */ } }, [aaKey])
+  const toggleAa = () => setAa(v => { try { localStorage.setItem(aaKey, v ? '0' : '1') } catch { /* private mode */ } return !v })
   useEffect(() => {
-    // The comments panel opens below whatever holds the Comments button: this title row, or the page's tabs row.
-    const el = inChrome ? (chrome!.tools!.closest('header') as HTMLElement | null) ?? chrome!.tools! : topRef.current
+    // The comments panel opens below whatever holds the Comments button: this title row, the toolbar row, or the page's tabs row.
+    const el = simple ? barRef.current : inChrome ? (chrome!.tools!.closest('header') as HTMLElement | null) ?? chrome!.tools! : topRef.current
     const root = rootRef.current
     if (!el || !root) return
     const put = () => root.style.setProperty('--fx-sh-top-h', `${Math.max(0, Math.round(el.getBoundingClientRect().bottom))}px`)
@@ -373,7 +385,7 @@ export function Workbook(p: WorkbookProps) {
     ro.observe(el)
     window.addEventListener('scroll', put, true)
     return () => { ro.disconnect(); window.removeEventListener('scroll', put, true) }
-  }, [inChrome, chrome])
+  }, [inChrome, chrome, simple])
   const [sel, setSel] = useState<{ cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean; stats?: SelStats } | null>(null)
   // ── spec 020: zoom per sheet, the status bar's mode, the custom lists, the Go To / Series / Validation dialogs ──
   const tt = useTranslations('sheets.tips')
@@ -915,12 +927,13 @@ export function Workbook(p: WorkbookProps) {
         {createPortal(
           <span className={`fx-sh-status is-${status}`} data-save-status={status} role="status" aria-live="polite"
                 title={status === 'retrying' ? t('status.offline') : undefined}>{statusText}</span>, chrome!.status!)}
-        {createPortal(<div className="fx-sh-top-tools is-in-tabs">{headTools}</div>, chrome!.tools!)}
+        {!simple && createPortal(<div className="fx-sh-top-tools is-in-tabs">{headTools}</div>, chrome!.tools!)}
       </> : <div className="fx-sh-top" ref={topRef}>
         <nav className="fx-sh-crumbs" aria-label={t('crumb')} data-crumb="">
           {/* Spec 026: inside a Space, brand or My tasks page there is no Sheets section to go back to. */}
           {!inPage && <><Link href="/sheets">{t('crumb')}</Link><span aria-hidden="true">›</span></>}
-          <h1>{folderName}</h1>
+          {/* Simple sheet header: on a phone the page's breadcrumb already names it. */}
+          {!(inPage && chrome?.simple) && <h1>{folderName}</h1>}
           {/* User, 24 Nov 2026: no "Linked" tag — every sheet is the same kind of sheet. */}
         </nav>
         <span className={`fx-sh-status is-${status}`} data-save-status={status} role="status" aria-live="polite"
@@ -953,7 +966,35 @@ export function Workbook(p: WorkbookProps) {
           <button type="button" className="fx-sh-ib is-text" data-format-open="" aria-expanded={phoneFormat} onClick={() => setPhoneFormat(v => !v)}>{t('format.phone.open')}</button>
         )}
       </div>}
-      {!phone && open && (!openBlank || doc) && (
+      {simple && (
+        <div className="fx-sheetbar" role="toolbar" aria-label={t('bar.label')} data-sheet-bar="" ref={barRef}>
+          {/* The sheet groups by theme only. */}
+          {!openBlank && <span className="fx-sheetbar-chip" data-group-chip="">
+            <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z" /><path d="m3 13 9 5 9-5" /></svg>
+            {t('bar.theme')}
+          </span>}
+          <span className="fx-sheetbar-gap" />
+          {readOnly && <span className="fx-sh-lock" data-readonly=""><span aria-hidden="true">🔒 </span>{readOnly}</span>}
+          <span className="fx-sh-skip-live" role="status">{skip && <span className="fx-sh-skip" data-skip-note="">{skip}</span>}</span>
+          {openBlank && doc && (
+            <button type="button" className="fx-sh-ib is-text" data-board-menu="" aria-haspopup="menu" aria-expanded={!!boardMenu}
+                    title={tl('boardTip')} onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(), x = getComputedStyle(el).direction === 'rtl' ? r.left : r.right; setBoardMenu(m => (m ? null : { x, y: r.bottom + 4, el })) }}>
+              {tl('board')} <span aria-hidden="true">▾</span>
+            </button>
+          )}
+          <button type="button" className="fx-sheetbar-icon fx-cmt-btn" data-comments-btn="" aria-pressed={commentsOpen}
+                  aria-label={t('comments.button', { n: openThreads })} title={t('comments.button', { n: openThreads })} onClick={() => setCommentsOpen(v => !v)}>
+            <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+            {openThreads > 0 && <span className="fx-cmt-badge">{openThreads}</span>}
+          </button>
+          <span ref={setBarTools} className="fx-sheetbar-tools" data-sheet-bar-tools="" />
+          <button type="button" className={`fx-sheetbar-icon is-aa${aa ? ' is-on' : ''}`} data-format-toggle="" aria-pressed={aa}
+                  aria-label={t('bar.formatting')} title={t('bar.formatting')} onClick={toggleAa}>Aa</button>
+          <span aria-hidden="true" className="fx-sheetbar-sep" />
+          <span ref={setBarAdd} className="fx-sheetbar-add" data-sheet-bar-add="" />
+        </div>
+      )}
+      {!phone && open && (!openBlank || doc) && (!simple || aa) && (
         <FormatToolbar state={fmtState} target={fmtTarget} onFormatCells={() => setFormatCells(true)}
           painter={!!painter}
           onPainter={sticky => setPainter(pt => (pt && !sticky ? null : { style: fmtState?.style ?? null, sticky }))}
@@ -974,6 +1015,7 @@ export function Workbook(p: WorkbookProps) {
       )}
       <div role="status">{painter && <p className="fx-painter-note" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}</div>
 
+      <SheetBarContext.Provider value={sheetBar}>
       <div className={`fx-sh-panel${painter ? ' is-painting' : ''}`} id="fx-sh-panel" role="tabpanel" aria-labelledby={openId ? `sheet-tab-${openId}` : undefined}>
         {/* Spec 027: while an added tab is open the Board tab's sheet is set aside, so one sheet answers the toolbar. */}
         {p.linked && !openRows && <div className="fx-sh-linkedpane" hidden={openBlank} data-linked-pane=""><LinkedFormatsContext.Provider value={api}>{p.linked}</LinkedFormatsContext.Provider></div>}
@@ -992,6 +1034,8 @@ export function Workbook(p: WorkbookProps) {
               </div>
             : <div className="fx-sh-skeleton" data-sheet-loading="" role="status" aria-busy="true"><span className="sr-only">{t('ux.loading')}</span></div>)}
       </div>
+
+      </SheetBarContext.Provider>
 
       <TabBar
         sheets={visible}

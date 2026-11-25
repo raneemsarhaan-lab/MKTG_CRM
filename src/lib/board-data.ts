@@ -11,6 +11,7 @@ import { syncContentSheet } from '@/lib/content-rows-server'
 import { prisma } from '@/lib/prisma'
 import { cleanFeatures, withResolvedFeatures } from '@/lib/brand-features'
 import { cairoToday, dayDate, ruleFromSettings } from '@/lib/due-dates'
+import { cleanFavourites } from '@/lib/favourites'
 import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace, mapSpaceStage, mapContentType, mapTaskField, mapTypeField, mapMilestone, mapTemplate, mapContentRow } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
 
@@ -87,7 +88,7 @@ export async function loadBoardData(member: SessionMember) {
     // The Inbox (spec 006): this member's read mentions, live put-offs and prefs.
     prisma.mentionRead.findMany({ where: { member_id: member.id }, select: { comment_id: true } }),
     prisma.taskSnooze.findMany({ where: { member_id: member.id, until: { gt: now } }, select: { task_id: true, until: true } }),
-    prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true, board_sorts: true, sheet_layouts: true } }),
+    prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true, board_sorts: true, sheet_layouts: true, favourites: true } }),
     // Sheet columns the team has shaped, and custom values (spec 010).
     // Spec 021: a member's private My notes columns (sheet 'me:<id>') are never loaded for anyone's sheets.
     // T081: a My tasks sheet's columns ('tasks:me:<id>') reach only their owner.
@@ -181,6 +182,8 @@ export async function loadBoardData(member: SessionMember) {
     linkedRowHeights,
     spaces: liveSpaces,
     // This member's tab choices per page (home, pinned, hidden, last view), so a page opens on the right view at once.
+    // Simple sheet header (25 Nov 2026): the pages this member starred.
+    favourites: cleanFavourites(prefs?.favourites),
     viewPrefs: ((member as { view_prefs?: unknown }).view_prefs ?? {}) as Record<string, unknown>,
     // Fields (25 Nov 2026): custom fields promoted to Standard, and this person's own sheet columns per view.
     standardFields: (ws?.standard_fields ?? []) as string[],

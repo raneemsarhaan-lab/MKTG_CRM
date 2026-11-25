@@ -3552,3 +3552,63 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
 .fx-board-tab-bar { flex: none; padding: 8px 16px 6px; }
 .fx-board-tab-bar .fx-hd-tools { padding: 0; }
 .fx-sh-tablink { flex: none; margin-inline-end: 5px; vertical-align: -2px; color: #6B7080; }
+
+/* ── Simple sheet header (user, 25 Nov 2026, "Simple sheet header" board) ──────────────────────
+   Three rows like ClickUp: a grey breadcrumb with icons and ☆, the view tabs (open one bold and
+   underlined), and one toolbar strip (#F7F7F9): Theme on the left; Comments, Search, Filters, Mine, Aa
+   and "+ Post ▾" on the right. Aa shows the menus, formatting toolbar and formula bar. */
+.fx-simple-head { background: #FFFFFF; display: flex; flex-direction: column; padding: 0 22px; border-bottom: 1px solid #ECEDF0; }
+.fx-sh1 { display: flex; align-items: center; gap: 10px; min-height: 46px; }
+.fx-sh1-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; font: 500 13.5px var(--font-body); color: #7A7E89; }
+.fx-sh1-sep { color: #C4C4C2; }
+.fx-sh1-crumb { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.fx-sh1-crumb a { color: inherit; text-decoration: none; }
+.fx-sh1-crumb a:hover { color: #14131A; text-decoration: underline; }
+.fx-sh1-crumb.is-here { color: #14131A; font-weight: 700; }
+.fx-sh1-icon-svg { flex: none; color: #9AA0AC; }
+.fx-sh1-brand { flex: none; width: 18px; height: 18px; border-radius: 5px; object-fit: cover; display: inline-grid; place-items: center; color: #FFFFFF; font-size: 10.5px; font-weight: 800; }
+.fx-sh1-star { border: 0; background: none; cursor: pointer; color: #A4A8B2; padding: 4px; border-radius: 6px; display: inline-grid; place-items: center; }
+.fx-sh1-star:hover { background: #F3F4F6; color: #14131A; }
+.fx-sh1-star.is-on { color: #E8A20C; }
+.fx-sh1-saved, .fx-sh1-saved .fx-sh-status { font-size: 12px; color: #9AA0AC; font-weight: 500; }
+.fx-sh1-gap { flex: 1; }
+.fx-sh1-icon { border: 0; background: none; cursor: pointer; color: #6B7080; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; }
+.fx-sh1-icon:hover, .fx-sh1-icon[aria-expanded="true"] { background: #F3F4F6; color: #14131A; }
+.fx-sh2 { border-top: 0; }
+.fx-sh2 .fx-view-tab, .fx-sh2 .fx-view-tab.is-on, .fx-sh2 .fx-view-tab:hover:not(.is-on) { background: none; border-radius: 0; }
+.fx-sh2 .fx-view-tab::after { inset-inline: 10px 8px; height: 2px; }
+.fx-sh2 .fx-view-tab-btn { padding: 8px 4px 10px 10px; font-weight: 500; }
+.fx-sh2 .fx-view-tab.is-on .fx-view-tab-btn { font-weight: 700; }
+.fx-sh2 .fx-view-tab:hover .fx-view-tab-btn { color: #14131A; }
+.fx-sh2 .fx-view-add { padding: 8px 10px 10px; font-weight: 500; }
+.fx-sh2-sep { width: 1px; height: 18px; background: #E3E5EA; margin: 0 6px 2px; flex: none; }
+
+.fx-sheetbar { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 18px; background: #F7F7F9; border-bottom: 1px solid #ECEDF0; flex-wrap: wrap; }
+.fx-sheetbar-gap { flex: 1; }
+.fx-sheetbar-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 1px solid #E3E5EA; border-radius: 999px; background: #FFFFFF; font: 600 12.5px var(--font-body); color: #3D4150; }
+.fx-sheetbar-icon { position: relative; border: 0; background: none; cursor: pointer; color: #5E6372; height: 32px; min-width: 32px; padding: 0 6px; border-radius: 8px; display: inline-grid; place-items: center; font: 700 13.5px var(--font-body); }
+.fx-sheetbar-icon:hover, .fx-sheetbar-icon[aria-pressed="true"], .fx-sheetbar-icon[aria-expanded="true"] { background: #ECEDF1; color: #14131A; }
+.fx-sheetbar-icon.is-aa.is-on { background: #E4E6EB; color: #14131A; }
+.fx-sheetbar-tools, .fx-sheetbar-own { display: contents; }
+.fx-sheetbar-search { display: inline-flex; align-items: center; gap: 4px; }
+.fx-sheetbar-search input { width: 0; opacity: 0; padding: 0; border: 1px solid transparent; transition: width .15s, opacity .15s; height: 30px; border-radius: 8px; font: 500 13px var(--font-body); background: #FFFFFF; }
+.fx-sheetbar-search.is-open input { width: 190px; opacity: 1; padding: 0 10px; border-color: #E3E5EA; }
+.fx-sheetbar-filters { display: inline-flex; }
+.fx-sheetbar-filters button { height: 32px; border: 0; background: none; border-radius: 8px; color: #5E6372; font: 600 13px var(--font-body); }
+.fx-sheetbar-filters button:hover { background: #ECEDF1; color: #14131A; }
+.fx-sheetbar-mine { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px; border: 0; background: none; border-radius: 8px; cursor: pointer; font: 600 12.5px var(--font-body); color: #3D4150; }
+.fx-sheetbar-mine:hover { background: #ECEDF1; }
+.fx-sheetbar-mine.is-on { background: #E6F2EC; color: #14533B; padding-inline-end: 10px; }
+.fx-sheetbar-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; display: inline-grid; place-items: center; color: #FFFFFF; font-size: 11px; font-weight: 800; flex: none; }
+.fx-sheetbar-mine.is-on .fx-sheetbar-avatar { box-shadow: 0 0 0 2px #1E8F6A; }
+.fx-sheetbar-sep { width: 1px; height: 20px; background: #DDDFE4; margin: 0 6px; }
+.fx-sheetbar-add { display: inline-flex; }
+.fx-sheetbar-split { display: inline-flex; align-items: stretch; height: 32px; border-radius: 9px; overflow: hidden; background: #14131A; }
+.fx-sheetbar-addmain { border: 0; background: #14131A; color: #FFFFFF; font: 700 13px var(--font-body); padding: 0 12px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.fx-sheetbar-addmore { border: 0; border-inline-start: 1px solid #3A3942; background: #14131A; color: #FFFFFF; padding: 0 9px; cursor: pointer; font-size: 11px; }
+.fx-sheetbar-addmain:hover, .fx-sheetbar-addmore:hover, .fx-sheetbar-addmore[aria-expanded="true"] { background: #2A2932; }
+@media (max-width: 720px) {
+  .fx-simple-head { padding: 0 12px; }
+  .fx-sheetbar { padding: 4px 12px; }
+  .fx-sheetbar-search.is-open input { width: 130px; }
+}
