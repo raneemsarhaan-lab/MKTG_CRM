@@ -25,12 +25,14 @@ export function ListIcon() {
   )
 }
 
-export function ViewPair({ view, onView }: { view: 'board' | 'sheet'; onView(v: 'board' | 'sheet'): void }) {
+export function ViewPair({ view, onView, layout = false }: { view: 'board' | 'sheet'; onView(v: 'board' | 'sheet'): void; layout?: boolean }) {
   const t = useTranslations('header')
+  // Spec 027: as a layout toggle (a Space page's Board) the pair reads Cards | List.
+  const word = (v: 'board' | 'sheet') => (layout ? t(v === 'board' ? 'cards' : 'listLayout') : t(v))
   const item = (v: 'board' | 'sheet', icon: React.ReactNode) => (
-    <button type="button" aria-pressed={view === v} data-view={v} title={t(v)} aria-label={t(v)}
+    <button type="button" aria-pressed={view === v} data-view={v} {...(layout ? { 'data-layout': v === 'board' ? 'cards' : 'list' } : {})} title={word(v)} aria-label={word(v)}
             onClick={() => { if (view !== v) onView(v) }}>
-      {icon}<span className="fx-hd-lbl">{t(v)}</span>
+      {icon}<span className="fx-hd-lbl">{word(v)}</span>
     </button>
   )
   return (

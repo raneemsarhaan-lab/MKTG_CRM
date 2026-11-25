@@ -1,5 +1,18 @@
 // Spec 023 Stage A: task types, the Fields button, task fields in sheets, required fields.
 module.exports = (EMAIL, psql, ok) => {
+  // Spec 027 sheet look: the grid draws only the rows near the screen; scroll down it (as a person would) until the cell is there.
+  const findInSheet = async (page, sel, timeout = 60000) => {
+    const end = Date.now() + timeout
+    await page.waitForSelector('.fx-sheet-scroll', { timeout })
+    while (Date.now() < end) {
+      const el = await page.$(sel)
+      if (el) { await el.scrollIntoViewIfNeeded(); return }
+      await page.evaluate(() => { const s = document.querySelector('.fx-sheet-scroll'); if (s) s.scrollTop = s.scrollTop + s.clientHeight * 0.8 >= s.scrollHeight - s.clientHeight ? 0 : s.scrollTop + s.clientHeight * 0.8 })
+      await page.waitForTimeout(150)
+    }
+    throw new Error(`not found in the sheet: ${sel}`)
+  }
+
   const rnd = () => Math.floor(Math.random() * 1e6)
   const space = key => psql(`select id from team_spaces where key='${key}'`)
   const brand = () => psql(`select id from brands order by name limit 1`)
@@ -135,7 +148,7 @@ module.exports = (EMAIL, psql, ok) => {
         try {
           await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
           const cell = id => `[data-cell="t:${id}|f:${fid}"]`
-          await page.waitForSelector(cell(post), { timeout: 60000 })
+          await findInSheet(page, cell(post))
           await page.click(cell(post))
           await page.keyboard.type('#eid')
           await page.keyboard.press('Enter')

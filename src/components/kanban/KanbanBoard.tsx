@@ -37,6 +37,7 @@ import {
 } from './BoardFilters'
 import { BoardHeader } from '@/components/board/BoardHeader'
 import { BoardToolbar } from '@/components/board/BoardToolbar'
+import { ListView } from '@/components/views/ListView'
 import { setBoardSort } from '@/actions/views'
 import { defaultAssigneeFor } from '@/lib/spaces'
 import { isLinkedMedia } from '@/lib/media'
@@ -270,6 +271,11 @@ function KanbanBoardInner({
   // The Pipeline tab returns to the pipeline view last shown (spec 011 R10).
   const [lastPipelineView, setLastPipelineView] = useState<'board' | 'sheet'>(() =>
     searchParams.get('view') === 'sheet' ? 'sheet' : 'board')
+  // Spec 027 (US1): a Space page's Board shows its cards or a compact list of the same tasks (remembered here).
+  const layoutKey = `momentum.board.layout.${boardKey ?? spaceId ?? 'board'}`
+  const [boardLayout, setBoardLayout] = useState<'cards' | 'list'>('cards')
+  useEffect(() => { try { if (window.localStorage.getItem(layoutKey) === 'list') setBoardLayout('list') } catch { /* private mode */ } }, [layoutKey])
+  const chooseLayout = (l: 'cards' | 'list') => { setBoardLayout(l); try { window.localStorage.setItem(layoutKey, l) } catch { /* private mode */ } }
   // Inside a Sheets folder, "Board" leaves for the board itself.
   const setView = (v: BoardView) => { if (embedded && v === 'board') router.push('/board'); else setViewState(v) }
   useEffect(() => { if (view !== 'content') setLastPipelineView(view) }, [view])
@@ -1366,8 +1372,9 @@ function KanbanBoardInner({
           noProject={noProject}
           filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} />}
           sort={<SortMenu value={sortBy} onChange={chooseSort} onReset={resetSort} noPriority={!featureOnAny(liveTasks.map(x => x.brand), 'priorities')} />}
-          view="board"
-          onView={v => setView(v)}
+          view={hosted && boardLayout === 'list' ? 'sheet' : 'board'}
+          onView={v => (hosted ? chooseLayout(v === 'sheet' ? 'list' : 'cards') : setView(v))}
+          layoutToggle={hosted}
           display={
             <ViewMenu
               showWeek={inbox.showWeek}
@@ -1436,7 +1443,13 @@ function KanbanBoardInner({
             columns at 244px is about seven screens wide, and shrinking them
             makes a worse tool rather than a smaller one; stacked, each stage
             is a heading with its cards at full width under it. */}
-        <div className="fx-board-cols" style={{
+        {/* Spec 027 (US1): on a Space page, List shows the same board as a compact list; it never opens the sheet. */}
+        {hosted && boardLayout === 'list' ? (
+          <div data-board-list="">
+            <ListView tasks={filteredTasks as never} brands={brands} members={members} slaConfig={slaConfig} today={today}
+              spaceStages={ss ?? null} onOpen={id => selectTask(id)} />
+          </div>
+        ) : <div className="fx-board-cols" style={{
           display: 'grid', gridAutoFlow: 'column', gridAutoColumns: '244px',
           gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
           minWidth: 0, padding: '0 26px 16px 38px',
@@ -1486,7 +1499,7 @@ function KanbanBoardInner({
               />
             )
           })}
-        </div>
+        </div>}
 
         {/* The dragged card itself — a sortable item does not follow the
             pointer across columns, the overlay does. */}

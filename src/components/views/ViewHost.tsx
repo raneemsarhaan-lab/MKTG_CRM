@@ -95,6 +95,9 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   const [views, setViews] = useState<SavedView[]>([])
   const [drafts, setDrafts] = useState<Record<string, ViewConfig>>({})
   const [adding, setAdding] = useState(false)
+  // Spec 027 (US1): renaming a saved view in its tab, and the delete confirmation.
+  const [renaming, setRenaming] = useState<{ key: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState<SavedView | null>(null)
   const [say, setSay] = useState('')
   // Home, pinned and hidden tabs (user, 2026-11-22), this member's own per page.
   const [prefs, setPrefs] = useState<TabPrefs>(initialPrefs ?? EMPTY_TAB_PREFS)
@@ -148,6 +151,17 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
     window.history.replaceState(null, '', url)
   }
 
+  // Spec 027 (US1): the page reopens on the view used last, however it was opened (a click, a link, a refresh).
+  useEffect(() => {
+    const cur = prefsRef.current
+    if (!node || !tab || cur.last === tab) return
+    if (tab.startsWith('v:') && !views.some(v => savedKey(v) === tab)) return
+    const p = { ...cur, last: tab }
+    prefsRef.current = p
+    setPrefs(p)
+    void setTabPrefs(node, p).catch(() => null)
+  }, [tab, node, views]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const open = views.find(v => savedKey(v) === tab) ?? null
   const allTabs: (ViewTab & { personal?: boolean })[] = [...tabs, ...views.map(v => ({ key: savedKey(v), label: v.name, personal: !!v.owner_id }))]
   const arranged = node ? arrangeTabs(allTabs, prefs) : { shown: allTabs, hidden: [] as typeof allTabs }
@@ -182,6 +196,27 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
     const next = { ...prefs, fields: { ...(prefs.fields ?? {}), [tab]: keys } }
     setPrefs(next)
     if (node) void setTabPrefs(node, next).catch(() => null)
+  }
+
+  async function renameSaved(key: string, name: string) {
+    const v = views.find(x => savedKey(x) === key)
+    setRenaming(null)
+    const clean = name.trim()
+    if (!v || !clean || clean === v.name) return
+    const r = await saveView({ id: v.id, node: v.node, type: v.type, name: clean, config: drafts[v.id] ?? cleanConfig(v.config), personal: !!v.owner_id }).catch(() => null)
+    if (!r?.success) { setSay(t('notSaved', { reason: r?.error ?? 'generic' })); return }
+    await reload()
+  }
+  async function duplicateSaved(v: SavedView) {
+    const r = await saveView({ node: v.node, type: v.type, name: t('copyName', { name: v.name }).slice(0, 40), config: cleanConfig(v.config), personal: true }).catch(() => null)
+    if (!r?.success) { setSay(t('notSaved', { reason: r?.error ?? 'generic' })); return }
+    await reload(`v:${r.id}`)
+  }
+  async function deleteSaved(v: SavedView) {
+    setDeleting(null)
+    const r = await deleteView(v.id).catch(() => null)
+    if (!r?.success) { setSay(t('notSaved', { reason: r?.error ?? 'generic' })); return }
+    await reload(tab === savedKey(v) ? live[0]?.key : undefined)
   }
 
   return (
@@ -228,10 +263,20 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
                 {/* User, 24 Nov 2026: the home view and pinned views carry an icon before their name. */}
                 {prefs.home === x.key && <svg role="img" aria-label={t('homeMark')} data-view-home="" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginInlineEnd: 5, verticalAlign: '-2px' }}><title>{t('homeMark')}</title><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>}
                 {prefs.pinned.includes(x.key) && <svg role="img" aria-label={t('pinnedMark')} data-view-pinned="" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginInlineEnd: 5, verticalAlign: '-2px' }}><title>{t('pinnedMark')}</title><path d="M12 17v5" /><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" /></svg>}
-                {x.label}
+                {renaming?.key === x.key ? null : x.label}
                 {x.note && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 500 }}>{x.note}</span>}
                 {x.personal && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 500 }}>· {t('onlyMeMark')}</span>}
               </button>
+              {renaming?.key === x.key && (
+                <input data-view-rename={x.key} aria-label={t('rename')} ref={el => { if (el && document.activeElement !== el && !el.dataset.focused) { el.dataset.focused = '1'; el.focus(); el.select() } }} maxLength={40} value={renaming.name}
+                  onChange={e => setRenaming({ key: x.key, name: e.target.value })}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') { e.preventDefault(); setRenaming(null) }
+                    if (e.key === 'Enter') { e.preventDefault(); void renameSaved(x.key, renaming.name) }
+                  }}
+                  onBlur={() => void renameSaved(x.key, renaming.name)}
+                  style={{ width: Math.max(80, renaming.name.length * 8 + 24), font: 'inherit', fontSize: 13.5, fontWeight: 600, border: `1px solid ${PIPE.border}`, borderRadius: 7, padding: '4px 8px', margin: '6px 4px 8px 0' }} />
+              )}
               {node && !x.disabled && (
                 <button type="button" data-tab-menu={x.key} aria-label={t('tabOptions', { name: x.label })} aria-haspopup="menu"
                   onClick={e => setTabMenu({ key: x.key, ...menuAt(e) })}
@@ -266,9 +311,28 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
           { key: 'home', label: prefs.home === k ? t('homeOff') : t('makeHome'), run: () => updatePrefs({ ...prefs, home: prefs.home === k ? null : k }) },
           { key: 'pin', label: pinned ? t('unpin') : t('pin'), run: () => updatePrefs({ ...prefs, pinned: pinned ? prefs.pinned.filter(x => x !== k) : [...prefs.pinned, k] }) },
           { key: 'hide', label: t('hide'), disabled: lastShown, run: () => updatePrefs({ ...prefs, pinned: prefs.pinned.filter(x => x !== k), hidden: [...prefs.hidden, k], home: prefs.home === k ? null : prefs.home }) },
+          // Spec 027 (US1): a saved view is renamed, duplicated or deleted from its tab; Board, Sheet and Calendar can't be deleted.
+          ...(() => {
+            const v = views.find(x => savedKey(x) === k)
+            if (!v) return []
+            return [
+              // After the menu has closed and given focus back, so the name box keeps it.
+              { key: 'rename', label: t('rename'), disabled: !mayChange(v), run: () => { setTabMenu(null); window.setTimeout(() => setRenaming({ key: k, name: v.name }), 60) } },
+              { key: 'duplicate', label: t('duplicate'), run: () => { setTabMenu(null); void duplicateSaved(v) } },
+              { key: 'delete', label: t('deleteView'), disabled: !mayChange(v), run: () => { setTabMenu(null); setDeleting(v) } },
+            ]
+          })(),
         ]
         return <TabMenu at={tabMenu} items={items} label={t('tabOptions', { name: allTabs.find(x => x.key === k)?.label ?? '' })} onClose={() => setTabMenu(null)} />
       })()}
+      {deleting && (
+        <div role="alertdialog" aria-label={t('deleteConfirm', { name: deleting.name })} data-view-delete-confirm=""
+          style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 38px', background: '#FFF4F4', borderBottom: `1px solid ${PIPE.border}`, fontSize: 13 }}>
+          <span>{t('deleteConfirm', { name: deleting.name })}</span>
+          <button type="button" data-view-delete-yes="" onClick={() => void deleteSaved(deleting)} style={{ ...pill, background: '#D22040', borderColor: '#D22040', color: '#FFFFFF' }}>{t('deleteView')}</button>
+          <button type="button" onClick={() => setDeleting(null)} style={pill}>{t('cancel')}</button>
+        </div>
+      )}
       {hiddenMenu && (
         <TabMenu at={hiddenMenu} label={t('hiddenViews', { n: arranged.hidden.length })} onClose={() => setHiddenMenu(null)}
           items={arranged.hidden.map(x => ({ key: x.key, label: t('showView', { name: x.label }), run: () => { setHiddenMenu(null); updatePrefs({ ...prefs, hidden: prefs.hidden.filter(h => h !== x.key) }); choose(x.key) } }))} />

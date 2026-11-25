@@ -15,7 +15,7 @@ import type { Brand } from '@/types/index'
 import { BrandMenu } from './BrandMenu'
 import { ViewPair } from './ViewPair'
 
-export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noProject, filters, sort, view, onView, display, hideBrands = false }: {
+export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noProject, filters, sort, view, onView, display, hideBrands = false, layoutToggle }: {
   /** Spec 025: the page has its own brand filter (a Space) or is one brand (a folder, a brand page). */
   hideBrands?: boolean
   scope: 'me' | 'team'
@@ -31,6 +31,8 @@ export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noP
   sort: ReactNode
   view: 'board' | 'sheet'
   onView(v: 'board' | 'sheet'): void
+  /** Spec 027: on a Space page the pair is Cards | List (the same board), not Board | Sheet. */
+  layoutToggle?: boolean
   /** Display options (the View menu). */
   display: ReactNode
 }) {
@@ -54,7 +56,7 @@ export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noP
         </span>
       )}
       <div className="fx-hd-end">
-        <ViewPair view={view} onView={onView} />
+        <ViewPair view={view} onView={onView} layout={layoutToggle} />
         <span className="fx-hd-vr" aria-hidden="true" />
         {display}
       </div>

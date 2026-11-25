@@ -1,5 +1,18 @@
 // Spec 023 Stage C: start dates — panel, sheet, calendar spans, workload spread.
 module.exports = (EMAIL, psql, ok) => {
+  // Spec 027 sheet look: the grid draws only the rows near the screen; scroll down it (as a person would) until the cell is there.
+  const findInSheet = async (page, sel, timeout = 60000) => {
+    const end = Date.now() + timeout
+    await page.waitForSelector('.fx-sheet-scroll', { timeout })
+    while (Date.now() < end) {
+      const el = await page.$(sel)
+      if (el) { await el.scrollIntoViewIfNeeded(); return }
+      await page.evaluate(() => { const s = document.querySelector('.fx-sheet-scroll'); if (s) s.scrollTop = s.scrollTop + s.clientHeight * 0.8 >= s.scrollHeight - s.clientHeight ? 0 : s.scrollTop + s.clientHeight * 0.8 })
+      await page.waitForTimeout(150)
+    }
+    throw new Error(`not found in the sheet: ${sel}`)
+  }
+
   const rnd = () => String(Math.floor(1e5 + Math.random() * 9e5))
   const space = key => psql(`select id from team_spaces where key='${key}'`)
   const who = k => psql(`select id from members where email='${EMAIL[k]}'`)
@@ -78,7 +91,7 @@ module.exports = (EMAIL, psql, ok) => {
 
           // Sheet: a Start column.
           await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
-          await page.waitForSelector(`[data-start-cell="2026-12-06"]`, { timeout: 30000 })
+          await findInSheet(page, `[data-start-cell="2026-12-06"]`, 30000)
           ok(true, 'the sheet shows the start date')
         } finally { drop(id) }
       },

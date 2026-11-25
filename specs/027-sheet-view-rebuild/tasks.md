@@ -35,15 +35,15 @@
 
 ### Tests
 
-- [ ] T007 [P] [US1] Scenarios in scripts/spaces-lab/realapp/scenarios-027-views.cjs: Sheet opens on click, on refresh and from its link (no `[data-node-workbook-loading]` after 10 s); Board Cards/List toggle shows `[data-list-view]`/cards and never `[data-workbook]`; + View of type List; tab menu Rename, Duplicate, Delete on a saved view; no Delete on Board/Sheet/Calendar; reopening the Space lands on the last view
+- [X] T007 [P] [US1] Scenarios in scripts/spaces-lab/realapp/scenarios-027-views.cjs: Sheet opens on click, on refresh and from its link (no `[data-node-workbook-loading]` after 10 s); Board Cards/List toggle shows `[data-list-view]`/cards and never `[data-workbook]`; + View of type List; tab menu Rename, Duplicate, Delete on a saved view; no Delete on Board/Sheet/Calendar; reopening the Space lands on the last view
 
 ### Implementation
 
-- [ ] T008 [P] [US1] `renameView(id, name)` and `duplicateView(id)` in src/actions/views.ts (owner of personal views; leads for shared), per contracts
-- [ ] T009 [US1] View tab "…" menu in src/components/views/ViewHost.tsx: Rename (inline edit), Duplicate, Set as default (existing home), Delete (saved views only, confirm), Pin, Hide; `data-tab-action` hooks for tests
-- [ ] T010 [US1] Board layout toggle in src/components/kanban/KanbanBoard.tsx: two options, Cards and List (compact list of the same board, grouped by stage); remove the toggle's sheet option and its `?view=` writes when embedded in a Space page
-- [ ] T011 [US1] Offer List in "+ View" on Space and folder pages (src/components/views/SpacePage.tsx, already rendering ListView) and on Brand pages (src/components/views/BrandPage.tsx)
-- [ ] T012 [US1] Verify last-view memory per Space and per folder node (`space:<id>` vs `space:<id>:brand:<id>`) in src/components/views/ViewHost.tsx; fix if a folder inherits the Space's last view
+- [X] T008 [P] [US1] Rename and duplicate saved views (done with the existing `saveView` — with its id it renames, without it copies — and `deleteView`; same owner/lead rules) in src/actions/views.ts
+- [X] T009 [US1] View tab "…" menu in src/components/views/ViewHost.tsx: Rename (inline edit), Duplicate, Set as default (existing home), Delete (saved views only, confirm), Pin, Hide; `data-tab-action` hooks for tests
+- [X] T010 [US1] Board layout toggle in src/components/kanban/KanbanBoard.tsx: two options, Cards and List (compact list of the same board, grouped by stage); remove the toggle's sheet option and its `?view=` writes when embedded in a Space page
+- [X] T011 [US1] Offer List in "+ View" on Space and folder pages (src/components/views/SpacePage.tsx, already rendering ListView) and on Brand pages (src/components/views/BrandPage.tsx)
+- [X] T012 [US1] Verify last-view memory per Space and per folder node (`space:<id>` vs `space:<id>:brand:<id>`) in src/components/views/ViewHost.tsx; fix if a folder inherits the Space's last view
 
 **Checkpoint**: US1 scenarios and the full suite green → commit, push.
 

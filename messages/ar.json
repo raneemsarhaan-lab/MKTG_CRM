@@ -1130,7 +1130,9 @@
     "noProject": "{n, plural, one {مهمة واحدة بلا مشروع} two {مهمتان بلا مشروع} few {# مهام بلا مشروع} many {# مهمة بلا مشروع} other {# مهمة بلا مشروع}}",
     "allAttached": "كل المهام لها مشروع",
     "account": "{name}، {role}",
-    "showing": "يظهر {shown} من {total} مهمة"
+    "showing": "يظهر {shown} من {total} مهمة",
+    "cards": "بطاقات",
+    "listLayout": "قائمة"
   },
   "notifications": {
     "bell": "الإشعارات",
@@ -3430,8 +3432,8 @@
     "getsSimple": "مهمة بسيطة: للتنفيذ › قيد التنفيذ › تم. بلا SLA ولا موافقات.",
     "getsPipeline": "مهمة في مسار المراحل: المراحل بأصحابها وSLA والموافقات.",
     "tabOptions": "خيارات {name}",
-    "makeHome": "اجعله العرض الرئيسي",
-    "homeOff": "لا تفتح عليه أولًا",
+    "makeHome": "تعيين كافتراضي",
+    "homeOff": "ليس الافتراضي",
     "homeMark": "العرض الرئيسي",
     "pin": "تثبيت",
     "unpin": "إلغاء التثبيت",
@@ -3457,7 +3459,11 @@
       "start": "تاريخ البدء",
       "platform": "المنصة",
       "theme": "الموضوع"
-    }
+    },
+    "rename": "إعادة تسمية",
+    "duplicate": "تكرار",
+    "copyName": "{name} (نسخة)",
+    "deleteConfirm": "حذف العرض «{name}»؟ لا تتأثر مهامه."
   },
   "calendar": {
     "today": "اليوم",

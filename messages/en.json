@@ -1130,7 +1130,9 @@
     "noProject": "{n, plural, one {# no project assigned} other {# no project assigned}}",
     "allAttached": "Every task has a project",
     "account": "{name}, {role}",
-    "showing": "Showing {shown} of {total} tasks"
+    "showing": "Showing {shown} of {total} tasks",
+    "cards": "Cards",
+    "listLayout": "List"
   },
   "notifications": {
     "bell": "Notifications",
@@ -3430,8 +3432,8 @@
     "getsSimple": "A simple task: To Do › In progress › Done. No SLA, no approvals.",
     "getsPipeline": "A pipeline task: the stages with their owners, SLA and approvals.",
     "tabOptions": "Options for {name}",
-    "makeHome": "Make home view",
-    "homeOff": "Stop opening here first",
+    "makeHome": "Set as default",
+    "homeOff": "Not the default",
     "homeMark": "Home view",
     "pin": "Pin",
     "unpin": "Unpin",
@@ -3457,7 +3459,11 @@
       "start": "Start date",
       "platform": "Platform",
       "theme": "Theme"
-    }
+    },
+    "rename": "Rename",
+    "duplicate": "Duplicate",
+    "copyName": "{name} (copy)",
+    "deleteConfirm": "Delete the view “{name}”? Its tasks aren't touched."
   },
   "calendar": {
     "today": "Today",

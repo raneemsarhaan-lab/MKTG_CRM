@@ -59,6 +59,7 @@ const SCENARIOS = [
   ...require(path.join(__dirname, 'scenarios-026.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-fields.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-password-reset.cjs'))(EMAIL, psql, ok),
+  ...require(path.join(__dirname, 'scenarios-027-views.cjs'))(EMAIL, psql, ok),
 ]
 
 ;(async () => {
