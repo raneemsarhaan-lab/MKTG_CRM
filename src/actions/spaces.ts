@@ -179,7 +179,10 @@ export async function updateSpaceSettings(id: string, patch: DeepPartial<SpaceSe
   if (next.flow.handoff && !next.flow.handoff_to.length) return { success: false, error: 'invalid_flow', problems: ['handoff_no_target'] }
   if (space.media_board && ALL_STAGES.indexOf(next.flow.start) < ALL_STAGES.indexOf('r-design')) return { success: false, error: 'invalid_flow', problems: ['handoff_outside'] }
   if (next.allowed_types.length && next.default_type && !next.allowed_types.includes(next.default_type)) next.default_type = next.allowed_types[0]
+  // The owner is a real member of the workspace, and of the Space (so its page and sheet open for them).
+  if (next.owner_id && !(await prisma.member.findUnique({ where: { id: next.owner_id }, select: { id: true } }))) next.owner_id = null
   await prisma.teamSpace.update({ where: { id }, data: { settings: next as unknown as object, updated_at: new Date() } })
+  if (next.owner_id) await prisma.teamSpaceMember.createMany({ data: [{ space_id: id, member_id: next.owner_id }], skipDuplicates: true })
   revalidateSpaces(space.key)
   return { success: true }
 }

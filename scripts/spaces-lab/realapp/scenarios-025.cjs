@@ -210,6 +210,35 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
+      // Owner's request, 25 Nov 2026: a Space has an owner, and the app opens on that Space for them.
+      id: '025-space-owner-lands-on-the-space', as: 'admin',
+      async run({ page, go }) {
+        const sp = space('planning')
+        const me = psql(`select id from members where email='${EMAIL.admin}'`)
+        const before = psql(`select settings::text from team_spaces where id='${sp}'`)
+        const wasMember = psql(`select count(*) from team_space_members where space_id='${sp}' and member_id='${me}'`) === '1'
+        try {
+          psql(`update team_spaces set settings = settings - 'owner_id' where id='${sp}'`)
+          await go('/')
+          ok(new URL(page.url()).pathname === '/overview', `with no Space of their own, the app opens on the Overview: ${page.url()}`)
+          // The owner is chosen in the Space's settings.
+          await go('/spaces/planning')
+          ok(!(await page.$('[data-space-rule]')) && !(await page.locator('text=/^Members:/').count()), 'no rule line and no members line under the title')
+          await page.click('[data-space-settings-open]')
+          await page.waitForSelector('[data-space-owner]')
+          await page.selectOption('[data-space-owner]', me)
+          await page.waitForFunction(() => document.querySelector('[data-space-settings-msg]')?.textContent?.includes('Saved'), null, { timeout: 15000 })
+          ok(psql(`select settings->>'owner_id' from team_spaces where id='${sp}'`) === me, 'the owner is saved')
+          ok(psql(`select count(*) from team_space_members where space_id='${sp}' and member_id='${me}'`) === '1', 'the owner is a member')
+          await go('/')
+          ok(new URL(page.url()).pathname === '/spaces/planning', `the app opens on their Space: ${page.url()}`)
+        } finally {
+          psql(`update team_spaces set settings='${before.replace(/'/g, "''")}'::jsonb where id='${sp}'`)
+          if (!wasMember) psql(`delete from team_space_members where space_id='${sp}' and member_id='${me}'`)
+        }
+      },
+    },
+    {
       // Release 2026-11-25: a tab tagged with a brand shows on its Space and in that brand's folder, not in the others.
       id: '025-tab-tagged-with-a-brand', as: 'admin',
       async run({ page, go }) {

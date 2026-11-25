@@ -28,7 +28,7 @@ export default function manifest(): MetadataRoute.Manifest {
     // limit before Android truncates.
     short_name: 'Momentum',
     description: 'Marketing CRM for Forefront Consulting',
-    start_url: '/overview?source=pwa',
+    start_url: '/?source=pwa',
     // Everything under the origin, so an in-app link never bounces the person
     // out into a browser tab halfway through a task.
     scope: '/',

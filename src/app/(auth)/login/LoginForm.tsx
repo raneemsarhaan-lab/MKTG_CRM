@@ -53,13 +53,16 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
    */
   function destination() {
     const raw = new URLSearchParams(window.location.search).get('callbackUrl')
-    if (!raw) return '/overview'
+    // '/' picks the member's landing page: the Space they own, else the Overview.
+    if (!raw) return '/'
     try {
       const url = new URL(raw, window.location.origin)
-      if (url.origin !== window.location.origin) return '/overview'
-      return url.pathname.startsWith('/login') ? '/overview' : url.pathname + url.search
+      if (url.origin !== window.location.origin) return '/'
+      // Opening the app signed out sends people to the Overview's address: that is "the app", not a page they chose.
+      if (url.pathname.startsWith('/login') || url.pathname === '/overview') return '/'
+      return url.pathname + url.search
     } catch {
-      return '/overview'
+      return '/'
     }
   }
 

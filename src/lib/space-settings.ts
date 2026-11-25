@@ -47,6 +47,8 @@ export interface FieldRule {
 export interface SpaceSettings {
   name_ar: string | null
   icon: string | null
+  /** The Space's owner (a member id): the app opens on this Space for them. Null: no owner. */
+  owner_id: string | null
   visibility: SpaceVisibility
   flow: SpaceFlow
   new_label: { en: string; ar: string } | null
@@ -72,7 +74,7 @@ export interface SpaceSettings {
 const LINK_ROLES = ['Content Creator', 'Digital Marketing Specialist']
 
 const base = (flow: SpaceFlow, extra: Partial<SpaceSettings> = {}): SpaceSettings => ({
-  name_ar: null, icon: null, visibility: 'members', flow,
+  name_ar: null, icon: null, owner_id: null, visibility: 'members', flow,
   new_label: null, allowed_types: [], default_type: null, default_priority: null,
   creators: 'members', child_rows: true, fields: {}, section_order: [...PANEL_SECTIONS],
   views: { default: 'board', sort: 'due', group: 'none', columns: [] },
@@ -146,6 +148,7 @@ export function resolveSettings(key: string, stored: unknown): SpaceSettings {
   return {
     name_ar: 'name_ar' in s ? str(s.name_ar) : d.name_ar,
     icon: 'icon' in s ? str(s.icon, 8) : d.icon,
+    owner_id: 'owner_id' in s ? (typeof s.owner_id === 'string' && /^[0-9a-f-]{36}$/i.test(s.owner_id) ? s.owner_id : null) : d.owner_id,
     visibility: pick(s.visibility, ['members', 'everyone'] as const, d.visibility),
     flow,
     new_label: 'new_label' in s ? (lbl && str(lbl.en, 40) ? { en: str(lbl.en, 40)!, ar: str(lbl.ar, 40) ?? str(lbl.en, 40)! } : null) : d.new_label,

@@ -57,10 +57,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
     && (!brandIds.length || (!!task.brand_id && brandIds.includes(task.brand_id))), [shown, board, flow, brandIds])
   const themeScope = useMemo(() => (brandIds.length ? (th: ContentTheme) => !!th.brand_id && brandIds.includes(th.brand_id) : undefined), [brandIds])
   const tasks = viewTasks(data).filter(scope)
-  const memberNames = data.spaceMembers.filter(r => r.space_id === spaceId)
-    .map(r => data.members.find(m => m.id === r.member_id)?.name).filter(Boolean).join(', ')
   const label = spaceLabel(space, t)
-  const rule = ['content', 'design', 'video', 'planning'].includes(space.key) ? t(`rules.${space.key}`) : t('rules.other')
   const sheetStart = space.key === 'content' ? 'content' : space.key === 'video' ? 'sheet' : null
   const open = (id: string) => selectTask(id)
   // Spec 024 (§3): the Space's own text for the add button, and who may create here.
@@ -96,13 +93,6 @@ export function SpacePage({ data, spaceId, brandId = null }: {
       </>}
       defaultTab={space.settings.views.default}
       initialPrefs={cleanTabPrefs(data.viewPrefs[folderBrand ? `space:${spaceId}:brand:${folderBrand.id}` : `space:${spaceId}`])}
-      sub={<span style={{ display: 'grid', gap: 8 }}>
-        <span style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-          <span data-space-rule>{folderBrand ? t('folderRule', { space: label, brand: folderBrand.name }) : rule}</span>
-          <span>{memberNames ? t('members', { names: memberNames }) : t('noMembers')}</span>
-        </span>
-        {/* User, 24 Nov 2026: no brand filter and no "Group by brand" here — a Space's brand folders in the sidebar do that. */}
-      </span>}
       tabs={[
         { key: 'board', label: tv('board') },
         { key: 'sheet', label: tv('sheet') },

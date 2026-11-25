@@ -152,6 +152,14 @@ function SpaceSettingsPanel({ space, data, onClose }: { space: TeamSpace; data: 
                   onChange={e => setColor(e.target.value)} onBlur={() => color !== space.color && run(() => updateSpace(space.id, { color }))} />
               </label>
             </div>
+            <label style={label}>{t('owner')}
+              <select style={{ ...input, maxWidth: 320 }} value={s.owner_id ?? ''} data-space-owner
+                onChange={e => { const v = e.target.value || null; if (v && !memberIds.includes(v)) setMemberIds([...memberIds, v]); set('owner_id', v) }}>
+                <option value="">{t('ownerNone')}</option>
+                {data.members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <span style={{ color: PIPE.textMuted, fontSize: 12, fontWeight: 500 }}>{t('ownerHint')}</span>
+            </label>
             <label style={label}>{t('visibility')}
               <select style={{ ...input, maxWidth: 320 }} value={s.visibility} data-space-visibility onChange={e => set('visibility', e.target.value as SpaceSettings['visibility'])}>
                 <option value="members">{t('visibleMembers')}</option>
