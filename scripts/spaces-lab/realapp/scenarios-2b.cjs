@@ -201,15 +201,15 @@ module.exports = (EMAIL, psql, ok) => {
         const loose = row(a, `Loose ${n}`, { pos: 9 })
         try {
           await open(page, go)
-          // Deleting a linked row asks; unlink keeps the task in its Space.
-          await menu(page, `k:${t}|rowNo`, 'Delete row')
-          await page.waitForSelector('[data-delete-row]')
-          ok(await page.isVisible('[data-delete-task="unlink"]'), 'asks to unlink or delete both')
-          await page.click('[data-delete-row-confirm]')
-          await page.waitForTimeout(2000)
-          ok(psql(`select count(*) from content_rows where task_id='${t}'`) === '0', 'the row is gone')
-          // Spec 026: the task carries on by itself — it keeps its theme, and the sheet doesn't give it a row again.
-          ok(psql(`select (project_id is not null)::text || '|' || sheet_row_off::text || '|' || (dropped_at is null)::text from tasks where id='${t}'`) === 'true|true|true', 'the task stays, and is not given a row again')
+          // Spec 027 (US2): the Board tab lists every task on the board, so a task's row there is archived,
+          // never deleted or unlinked (an added tab removes rows; scenarios-027-tabs.cjs).
+          await page.click(`[data-cell="k:${t}|rowNo"]`)
+          await page.waitForSelector('[role="menuitem"]', { timeout: 10000 })
+          const items = await page.locator('[role="menuitem"]').allTextContents()
+          ok(!items.some(x => /Delete row|Unlink task/.test(x)), `a task's row has no Delete or Unlink in the Board tab: ${items.join(' / ')}`)
+          ok(items.some(x => /Archive/.test(x)), 'it is archived instead')
+          await page.keyboard.press('Escape')
+          ok(psql(`select count(*) from content_rows where task_id='${t}'`) === '1', 'the row stays')
           // A parent row: its children move up a level.
           await menu(page, `l:${parent}|rowNo`, 'Delete row')
           await page.waitForSelector('[data-delete-children="up"]')

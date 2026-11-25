@@ -96,16 +96,12 @@ module.exports = (EMAIL, psql, ok) => {
           await page.locator('[role="menuitem"]', { hasText: `Lab pillar B ${n}` }).first().click()
           await page.waitForTimeout(2000)
           ok(psql(`select pillar_id from tasks where id='${t}'`) === b, 'the task\'s pillar follows the row')
-          // Unlink: the row keeps its last values as plain text; the task stays in its Space.
+          // Spec 027 (US2): the Board tab is always linked, so its rows aren't unlinked one by one (an added tab's
+          // are: scenarios-027-tabs.cjs).
           await page.click(`[data-cell="k:${t}|rowNo"]`)
-          await page.locator('[role="menuitem"]', { hasText: 'Unlink task' }).first().click()
-          await page.waitForTimeout(2000)
-          ok(psql(`select coalesce(task_id::text,'-') from content_rows where id='${r}'`) === '-', 'unlinked')
-          ok(psql(`select title || '|' || (values ->> 'f:${cap}') || '|' || (values ->> 'status') from content_rows where id='${r}'`) === `Lab linked ${n}|Typed in the panel|c-prog`, 'the row keeps its title, Caption and stage as plain text')
-          ok(psql(`select (dropped_at is null)::text || '|' || status from tasks where id='${t}'`) === 'true|c-prog', 'the task carries on')
-          ok(psql(`select count(*) from task_spaces where task_id='${t}' and space_id='${space('content')}'`) === '1', 'in its Space')
-          await openSheet(page, go, 'content', th)
-          ok(await page.isVisible(`[data-make-task="${r}"]`), 'and the sheet doesn\'t link it again by itself')
+          await page.waitForSelector('[role="menuitem"]', { timeout: 10000 })
+          ok(!(await page.locator('[role="menuitem"]').allTextContents()).some(x => /Unlink task/.test(x)), 'no Unlink task in the Board tab')
+          await page.keyboard.press('Escape')
         } finally { cleanup([th]) }
       },
     },
