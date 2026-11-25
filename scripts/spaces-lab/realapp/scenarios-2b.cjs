@@ -245,7 +245,13 @@ module.exports = (EMAIL, psql, ok) => {
           await open(page, go)
           await page.waitForTimeout(1500)
           if (await page.$('[data-hours-later]')) await page.click('[data-hours-later]')
-          ok(!(await page.$('[data-add-theme]')), 'a user has no "+ Theme"')
+          // The simple sheet header: "+ Theme" sits in the "+ Post ▾" menu, and a user's menu has none.
+          if (await page.$('[data-sheet-add-more]')) {
+            await page.click('[data-sheet-add-more]')
+            await page.waitForSelector('[data-menu-item="column"]')
+            ok(!(await page.$('[data-menu-item="theme"]')), 'a user has no "+ Theme"')
+            await page.keyboard.press('Escape')
+          } else ok(!(await page.$('[data-add-theme]')), 'a user has no "+ Theme"')
           // Anyone with access may add a row.
           await page.click(`[data-row="a:${th}:${pl}"] [data-col="title"]`)
           await typeDraft(page, `By a user ${n}`)

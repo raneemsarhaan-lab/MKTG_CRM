@@ -46,6 +46,17 @@ async function signIn(browser, who) {
       top = true
     }
   }
+  // The simple sheet header (25 Nov 2026): + Theme, + Column and + Add existing task moved into the
+  // "+ Post ▾" menu. A click on the old button opens that menu and picks the item instead.
+  const MOVED = { '[data-add-theme]': 'theme', '[data-add-column]': 'column', '[data-add-existing-task]': 'existing' }
+  const click = page.click.bind(page)
+  page.click = async (sel, opts) => {
+    if (typeof sel === 'string' && MOVED[sel] && !(await page.$(sel)) && (await page.$('[data-sheet-add-more]'))) {
+      await click('[data-sheet-add-more]')
+      return click(`[data-menu-item="${MOVED[sel]}"]`, opts)
+    }
+    return click(sel, opts)
+  }
   const errors = []
   page.on('pageerror', e => errors.push(e.message))
   page.on('console', m => { if (m.type() === 'error' && /MISSING_MESSAGE|FORMATTING_ERROR|Maximum update depth|unique "key"/.test(m.text())) errors.push(m.text().slice(0, 200)) })
