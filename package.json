@@ -25,7 +25,8 @@
     "lab:notify": "bash scripts/notify-lab/build.sh && node scripts/notify-lab/scenarios.mjs",
     "lab:spreadsheet": "bash scripts/spreadsheet-lab/build.sh && node scripts/spreadsheet-lab/scenarios.mjs",
     "lab:hours": "bash scripts/hours-lab/build.sh && node scripts/hours-lab/scenarios.mjs",
-    "lab:spaces": "bash scripts/spaces-lab/build.sh && node scripts/spaces-lab/scenarios.mjs"
+    "lab:spaces": "bash scripts/spaces-lab/build.sh && node scripts/spaces-lab/scenarios.mjs",
+    "lab:tablink": "tsx scripts/spaces-lab/tab-link.lab.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",
