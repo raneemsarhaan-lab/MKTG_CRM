@@ -47,8 +47,10 @@ module.exports = (EMAIL, psql, ok) => {
           ok(row === 'design:r-design:r-design:-', `an unlinked Design task at Ready For Design: ${row}`)
           ok(psql(`select count(*) from task_spaces where task_id='${id}' and space_id='${space('design')}'`) === '1', 'on the Design board')
           ok(psql(`select count(*) from task_spaces where task_id='${id}' and space_id<>'${space('design')}'`) === '0', 'and nowhere else')
+          // QA 26 Nov 2026 (F03, F21): a Design task on its own is just a task, with no "Unlinked" tag.
           await go('/spaces/design?view=board')
-          await page.waitForSelector(`[data-task-id="${id}"] [data-media-unlinked-card], [data-card="${id}"] [data-media-unlinked-card]`, { timeout: 20000 }).catch(() => null)
+          await page.waitForSelector(`[data-task-card="${id}"]`, { timeout: 20000 })
+          ok(!(await page.$(`[data-task-card="${id}"] [data-media-unlinked-card]`)), 'no "Unlinked" tag')
         } finally { drop([id]) }
       },
     },
@@ -60,13 +62,13 @@ module.exports = (EMAIL, psql, ok) => {
         const c2 = content(`Lab 022 other ${n}`)
         const m = media(`Lab 022 art ${n}`)
         try {
+          // QA 26 Nov 2026 (F21, owner): no linked copies — the list of separate Design/Video tasks is gone.
           await openLink(page, go, c, `art ${n}`)
-          await page.waitForSelector(`[data-media-option="${m}"]`, { timeout: 10000 })
-          await page.click(`[data-media-option="${m}"]`)
-          await page.waitForTimeout(2500)
-          ok(psql(`select content_task_id from tasks where id='${m}'`) === c, 'picking the unlinked Design task links it')
-          ok(psql(`select status from tasks where id='${c}'`) === 'r-design', "linked: the row's Status follows the Design task (user, 2026-11-23)")
-          await page.waitForSelector(`[data-task-sheet] [data-cell$="${c}|media"] [data-media-chip="design"]`, { timeout: 15000 })
+          await page.waitForTimeout(800)
+          ok(!(await page.$('[data-media-option]')), 'no separate Design or Video task is offered')
+          ok(!!(await page.$('[data-media-create]')), 'only putting the task itself on the boards')
+          await page.keyboard.press('Escape')
+          ok(psql(`select coalesce(content_task_id::text, '-') from tasks where id='${m}'`) === '-', 'the separate Design task stays on its own')
 
           await openLink(page, go, c2, `new ${n}`)
           await page.click('[data-media-board-choice="both"]')
@@ -96,10 +98,10 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
+      // QA 26 Nov 2026 (F21, owner): a calendar day makes one task that shows on the Design board too.
       id: '022-us3-calendar-day-link', as: 'admin',
       async run({ page, go }) {
         const n = rnd()
-        const m = media(`Lab 022 cal art ${n}`)
         const day = psql(`select to_char((now() at time zone 'Africa/Cairo')::date, 'YYYY-MM-DD')`)
         let c
         try {
@@ -108,15 +110,18 @@ module.exports = (EMAIL, psql, ok) => {
           await page.click(`[data-cal-link="${day}"]`)
           await page.waitForSelector('[data-media-pick]', { timeout: 10000 })
           await page.fill('[data-media-search]', `cal art ${n}`)
-          await page.waitForSelector(`[data-media-option="${m}"]`, { timeout: 10000 })
-          await page.click(`[data-media-option="${m}"]`)
+          ok(!(await page.$('[data-media-option]')), 'no separate Design or Video task is offered')
+          await page.click('[data-media-board-choice="design"]')
+          await page.click('[data-media-create] button')
           await page.waitForTimeout(3000)
-          c = psql(`select content_task_id from tasks where id='${m}'`)
-          ok(!!c, 'the Design task is linked to a new content task')
-          const row = psql(`select name||'|'||to_char(publish_date,'YYYY-MM-DD')||'|'||coalesce(media_board,'-') from tasks where id='${c}'`)
-          ok(row === `cal art ${n}|${day}|-`, `the content task has that day as its publishing date: ${row}`)
-          ok(psql(`select count(*) from task_spaces where task_id='${c}' and space_id='${space('content')}'`) === '1', 'in the Content Space')
-        } finally { drop([m, c]) }
+          c = psql(`select id from tasks where name='cal art ${n}' and dropped_at is null`)
+          ok(!!c, 'the task is made')
+          const row = psql(`select to_char(publish_date,'YYYY-MM-DD')||'|'||coalesce(media_board,'-') from tasks where id='${c}'`)
+          ok(row === `${day}|-`, `that day is its publishing date: ${row}`)
+          ok(psql(`select count(*) from tasks where content_task_id='${c}'`) === '0', 'no linked copy')
+          const on = psql(`select string_agg(s.key, ',' order by s.key) from task_spaces ts join team_spaces s on s.id=ts.space_id where ts.task_id='${c}'`)
+          ok(on.split(',').includes('content') && on.split(',').includes('design'), `the one task shows in Content and Design: ${on}`)
+        } finally { drop([c]) }
       },
     },
     {
