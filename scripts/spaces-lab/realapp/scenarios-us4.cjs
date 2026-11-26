@@ -31,40 +31,41 @@ module.exports = (EMAIL, psql, ok) => {
     {
       id: 'us4-switch-off-hides-for-that-brand-only', as: 'admin',
       async run({ page, go }) {
+        // QA 26 Nov 2026 (QF-07): Platform is hidden everywhere now, so Type is the field switched off here.
         reset()
         try {
           const a = seed('Features lab A', A), b = seed('Features lab B', B)
           asMine(a); asMine(b)
           await openPanel(page, go, A)
-          await page.click('[data-brand-features] [data-feature-switch="platform"]')
+          await page.click('[data-brand-features] [data-feature-switch="type"]')
           await page.waitForTimeout(1500)
-          ok(featuresOf(A) === '{"platform": false}', `the brand keeps an override: ${featuresOf(A)}`)
-          ok(await page.$('[data-brand-features] [data-feature-reset="platform"]'), 'it says the brand has its own setting')
+          ok(featuresOf(A) === '{"type": false}', `the brand keeps an override: ${featuresOf(A)}`)
+          ok(await page.$('[data-brand-features] [data-feature-reset="type"]'), 'it says the brand has its own setting')
 
           // Spec 026: the task sheet is a view of each brand's page.
           await go('/me?view=sheet')
-          await page.waitForSelector(cell(b, 'platform'), { timeout: 60000 })
-          ok((await page.locator(cell(b, 'platform')).innerText()).trim() === 'LinkedIn', "B's Platform still shows")
+          await page.waitForSelector(cell(b, 'type'), { timeout: 60000 })
+          ok((await page.locator(cell(b, 'type')).innerText()).trim() === 'Design', "B's Type still shows")
           await go('/me?view=sheet')
-          await page.waitForSelector(cell(a, 'platform'), { timeout: 60000 })
-          ok(await page.$(`${cell(a, 'platform')} [data-feature-off]`), "A's Platform is a hatched, empty cell")
-          await page.locator(cell(a, 'platform')).click()
-          await page.keyboard.type('Instagram')
+          await page.waitForSelector(cell(a, 'type'), { timeout: 60000 })
+          ok(await page.$(`${cell(a, 'type')} [data-feature-off]`), "A's Type is a hatched, empty cell")
+          await page.locator(cell(a, 'type')).click()
+          await page.keyboard.type('Post')
           await page.keyboard.press('Enter')
           await page.waitForTimeout(1200)
-          ok(psql(`select platform from tasks where id='${a}'`) === 'LinkedIn', "a hidden field can't be typed into, and its value is kept")
+          ok(psql(`select content_type_label from tasks where id='${a}'`) === 'Design', "a hidden field can't be typed into, and its value is kept")
 
           await go(`/spaces/design?view=board&task=${a}`)
           await page.waitForSelector('text=Time estimate', { timeout: 30000 })
-          ok(!(await page.locator('text=/^Platform$/').count()), 'the task panel has no Platform field')
+          ok(!(await page.locator('[role="dialog"] [aria-label="Type"]').count()), 'the task panel has no Type field')
 
           await openPanel(page, go, A)
-          await page.click('[data-brand-features] [data-feature-reset="platform"]')
+          await page.click('[data-brand-features] [data-feature-reset="type"]')
           await page.waitForTimeout(1500)
           ok(featuresOf(A) === '{}', 'Use default clears the override')
           await go('/me?view=sheet')
-          await page.waitForSelector(cell(a, 'platform'), { timeout: 60000 })
-          ok((await page.locator(cell(a, 'platform')).innerText()).trim() === 'LinkedIn', 'switched back on, the value returns')
+          await page.waitForSelector(cell(a, 'type'), { timeout: 60000 })
+          ok((await page.locator(cell(a, 'type')).innerText()).trim() === 'Design', 'switched back on, the value returns')
         } finally { reset() }
       },
     },

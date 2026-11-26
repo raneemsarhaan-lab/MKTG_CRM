@@ -33,10 +33,13 @@ module.exports = (EMAIL, psql, ok) => {
         ok(dates(t) === '2026-12-15|2026-12-08|false', `publishing Tue 15 Dec → due Tue 8 Dec, automatic: ${dates(t)}`)
         await setDate(page, '[data-publish-date]', '2026-12-18')
         ok(dates(t) === '2026-12-18|2026-12-10|false', `due on a Friday moves back to Thursday: ${dates(t)}`)
+        // The panel refreshes after the save; wait for it rather than a fixed pause.
+        await page.waitForFunction(() => /Thu 10 Dec/.test(document.querySelector('[data-due-date]')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {})
         ok(/Thu 10 Dec/.test(await page.textContent('[data-due-date]') ?? ''), 'the panel writes the due date as "Thu 10 Dec"')
 
         await setDate(page, '[data-due-date]', '2026-12-03')
         ok(dates(t) === '2026-12-18|2026-12-03|true', `a due date set by hand is marked: ${dates(t)}`)
+        await page.waitForSelector('[data-due-date] [data-due-manual-mark]', { timeout: 15000 }).catch(() => {})
         ok(await page.$('[data-due-date] [data-due-manual-mark]'), 'the hand-set mark shows')
         await setDate(page, '[data-publish-date]', '2026-12-22')
         ok(dates(t) === '2026-12-22|2026-12-03|true', `a new publishing date leaves it alone: ${dates(t)}`)
