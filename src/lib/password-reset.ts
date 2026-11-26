@@ -60,8 +60,15 @@ function resetEmail(locale: string, name: string, link: string) {
 }
 
 /** The site's address for the link: APP_URL / NEXTAUTH_URL, else the address the request came to. */
-function baseUrl(origin: string) {
-  return appUrl() || origin.replace(/\/$/, '')
+/**
+ * QA 26 Nov 2026 (F11): the link always points at the app's own address (APP_URL, else NEXTAUTH_URL). The
+ * request's address is only trusted outside production: a forged Host header must never decide where a
+ * reset link goes. In production with neither set, no link is sent (and the log says why).
+ */
+function baseUrl(origin: string): string | null {
+  const own = appUrl()
+  if (own) return own
+  return process.env.NODE_ENV === 'production' ? null : origin.replace(/\/$/, '')
 }
 
 /**
@@ -86,9 +93,14 @@ export async function requestReset(rawEmail: string, origin: string): Promise<{ 
     console.log(`[fluxo:reset] ${member.name} asked for a reset, but email isn't set up on this app`)
     return { email: false }
   }
+  const base = baseUrl(origin)
+  if (!base) {
+    console.log('[fluxo:reset] APP_URL is not set on this server, so no reset link was sent — set APP_URL to the app\'s address')
+    return { email: ready }
+  }
   const token = randomBytes(32).toString('base64url')
   await prisma.passwordReset.create({ data: { member_id: member.id, token_hash: hash(token), expires_at: new Date(Date.now() + RESET_TTL_MIN * 60_000) } })
-  const link = `${baseUrl(origin)}/reset-password?token=${token}`
+  const link = `${base}/reset-password?token=${token}`
   if (process.env.NODE_ENV !== 'production') console.log(`[fluxo:reset] dev link for ${member.email}: ${link}`)
   const { subject, html } = resetEmail(member.locale, member.name, link)
   const sent = await sendEmail(member.email, subject, html)
