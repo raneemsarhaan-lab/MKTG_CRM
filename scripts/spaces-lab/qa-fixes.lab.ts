@@ -92,6 +92,8 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   check('Own columns saved before: unchanged (unlisted columns hidden)', old.find(c => c.key === 'f:new')?.shown === false, old)
   const def = shownFields(null, 'board', [], new Set(), [])
   check('Cards: Owner, Start, Theme, Pillar off by default', !['owner', 'start', 'theme', 'pillar'].some(k => def.includes(k)) && def.includes('due') && def.includes('tags'), def)
+  const sheetDef = shownFields(null, 'sheet', [], new Set(), [])
+  check('Sheets and lists: Start still shows by default', sheetDef.includes('start') && sheetDef.includes('due'), sheetDef)
 }
 
 console.log(bad ? `\n${bad} failed` : '\nall passed')

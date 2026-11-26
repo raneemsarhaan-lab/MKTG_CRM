@@ -46,7 +46,8 @@ export function shownFields(
   const live = new Set(custom.filter(f => !f.retired).map(f => `f:${f.id}`))
   if (saved) return saved.filter(k => !CUSTOM_FIELD.test(k) || live.has(k))
   const onPage = custom.filter(f => !f.retired && links.some(l => l.field_id === f.id && typesOnPage.has(l.type_label)) && (view !== 'board' || f.on_card))
-  return [...VIEW_FIELDS.filter(k => !VIEW_FIELDS_OFF.includes(k)), ...onPage.map(f => `f:${f.id}`)]
+  // Cards start without the new ones; sheets and lists keep showing every standard field as before.
+  return [...VIEW_FIELDS.filter(k => view !== 'board' || !VIEW_FIELDS_OFF.includes(k)), ...onPage.map(f => `f:${f.id}`)]
 }
 
 export interface ViewConfig {
