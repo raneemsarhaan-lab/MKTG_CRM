@@ -18,7 +18,6 @@ import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import type { MediaBoard } from '@/types/index'
 import { MEDIA_BOARDS, isMediaBoard, spaceForBoard } from '@/lib/media'
-import { syncContent } from '@/lib/media-server'
 import { addAssignee } from '@/lib/needs-linked-task'
 import { addSpaces, loadSpaceContext } from '@/lib/spaces-server'
 import { defaultAssigneeFor, type SpaceLike } from '@/lib/spaces'
@@ -65,18 +64,9 @@ export async function linkToMedia(
   if (AFTER_D_CHECK.includes(content.status)) return { success: false, error: 'past_d_check' }
   if (!await canLink(me, content.id)) return { success: false, error: 'not_authorized' }
 
-  if ('mediaTaskId' in target) {
-    const m = await prisma.task.findUnique({ where: { id: target.mediaTaskId } })
-    if (!m || m.dropped_at || !m.media_board) return { success: false, error: 'not_found' }
-    if (m.content_task_id) return { success: false, error: 'already_linked' }
-    const taken = await prisma.task.findFirst({ where: { content_task_id: content.id, media_board: m.media_board, dropped_at: null }, select: { id: true } })
-    if (taken) return { success: false, error: 'already_linked' }
-    await prisma.task.update({ where: { id: m.id }, data: { content_task_id: content.id, updated_at: new Date() } })
-    // Linked by hand: the content row now follows the linked task's stage (user, 2026-11-23); the media task's SLA starts at Ready For Design (R10).
-    await syncContent(content.id, me.id)
-    revalidate()
-    return { success: true, linked: [m.id] }
-  }
+  // QA 26 Nov 2026 (F21, owner): there are no linked copies — the same task shows on the other boards.
+  // Linking a separate Design or Video task is refused; links made before stay as they are.
+  if ('mediaTaskId' in target) return { success: false, error: 'one_task' }
 
   const boards = [...new Set((target.create.boards ?? []).filter(isMediaBoard))]
   if (!boards.length) return { success: false, error: 'invalid' }
@@ -171,14 +161,15 @@ export async function linkFromCalendar(
   if (!me) return { success: false, error: 'not_authenticated' }
   const n = (name ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)
   if (!n || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return { success: false, error: 'invalid' }
+  // QA 26 Nov 2026 (F21): refused before anything is made.
+  if ('mediaTaskId' in target) return { success: false, error: 'one_task' }
   const { createTask } = await import('@/actions/tasks')
   let brand: string | null = null
-  if ('mediaTaskId' in target) brand = (await prisma.task.findUnique({ where: { id: target.mediaTaskId }, select: { brand_id: true } }))?.brand_id ?? null
   if (!brand) brand = (await prisma.brand.findFirst({ orderBy: { name: 'asc' }, select: { id: true } }))?.id ?? null
   if (!brand) return { success: false, error: 'no_brand' }
   const made = await createTask({ name: n, brand_id: brand, content_type_label: '', task_owner_id: me.id, assignee_id: me.access === 'user' ? me.id : undefined, publish_date: day, space_id: spaceId })
   if (!made.success || !made.id) return { success: false, error: made.error ?? 'generic' }
-  const linked = await linkToMedia(made.id, 'mediaTaskId' in target ? target : { create: { boards: target.create.boards } })
+  const linked = await linkToMedia(made.id, { create: { boards: target.create.boards } })
   if (!linked.success) return linked
   return { success: true, contentTaskId: made.id }
 }

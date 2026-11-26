@@ -9,12 +9,11 @@
  *     tasks searched by what was typed, then Create task (Design, Video, both).
  *   - useMediaLinks: the cell behaviour for any sheet or calendar.
  */
-import { createContext, useContext, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import type { MediaBoard } from '@/types/index'
 import { STAGE_META } from '@/lib/stage-meta'
-import { normTitle } from '@/lib/sheet-links'
 import { createMediaTask, linkFromCalendar, linkToMedia, relinkMedia, unlinkMedia } from '@/actions/media'
 import { Modal } from '@/components/sheets/Dialogs'
 import { SheetPopover } from '@/components/sheet/SheetMenu'
@@ -91,10 +90,8 @@ export function MediaLinkPicker({ typed, options, onPick, onCreate, onClose }: {
   const [q, setQ] = useState(typed)
   const [hi, setHi] = useState(0)
   const [boards, setBoards] = useState<'design' | 'video' | 'both'>('design')
-  const hits = useMemo(() => {
-    const words = normTitle(q).split(' ').filter(Boolean)
-    return options.filter(x => { const n = normTitle(x.name); return words.every(w => n.includes(w)) }).slice(0, 30)
-  }, [options, q])
+  void options; void onPick; void stage
+  const hits: MediaTaskLike[] = []
   const name = q.trim()
   const rows = hits.length + 1
   const create = () => onCreate(boards === 'both' ? ['design', 'video'] : [boards], name)
@@ -107,17 +104,7 @@ export function MediaLinkPicker({ typed, options, onPick, onCreate, onClose }: {
     <div className="fx-linkpick" role="dialog" aria-label={t('linkTask')} data-media-pick="" onKeyDown={onKey}>
       <input value={q} aria-label={t('search')} placeholder={t('search')} autoComplete="off" data-media-search=""
              onChange={e => { setQ(e.target.value); setHi(0) }} />
-      <span className="fx-linkpick-label">{t('unlinkedOn')}</span>
-      <div className="fx-linkpick-list" role="listbox" aria-label={t('unlinkedOn')}>
-        {hits.map((x, i) => (
-          <button key={x.id} type="button" role="option" aria-selected={hi === i} data-media-option={x.id}
-                  className={`fx-linkpick-opt${hi === i ? ' is-hi' : ''}`} onMouseEnter={() => setHi(i)} onClick={() => onPick(x.id, name)}>
-            <span className="fx-linkpick-name"><span className="fx-sheet-ellipsis">{x.name}</span><small>{[x.brand?.name, stage(x.status)].filter(Boolean).join(' · ')}</small></span>
-            <span className="fx-linkpick-kind is-pipe" style={{ borderColor: BOARD_COLOR[x.media_board ?? 'design'], color: BOARD_COLOR[x.media_board ?? 'design'] }}>{t(x.media_board ?? 'design')}</span>
-          </button>
-        ))}
-      </div>
-      {!hits.length && <p className="fx-linkpick-none">{t('noUnlinked')}</p>}
+      {/* QA 26 Nov 2026 (F21, owner): no list of separate Design/Video tasks to link — the task itself goes on the boards. */}
       <div>
         <div className={`fx-linkpick-opt is-create${hi === hits.length ? ' is-hi' : ''}`} data-media-create="" onMouseEnter={() => setHi(hits.length)}>
           <button type="button" style={{ border: 'none', background: 'none', font: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0, textAlign: 'start' }} onClick={create}>
@@ -150,7 +137,7 @@ export function useMediaLinks({ tasks, onOpenTask, say }: {
   const busy = useRef(false)
   const linkedOf = (id: string) => tasks.filter(x => x.content_task_id === id && !!x.media_board && !x.dropped_at)
   const unlinked = tasks.filter(x => !!x.media_board && !x.content_task_id && !x.dropped_at)
-  const why = (e: string) => (['past_d_check', 'already_linked', 'not_found', 'no_board', 'not_authorized'].includes(e) ? t(`err.${e}` as 'err.past_d_check') : t('err.generic'))
+  const why = (e: string) => (['one_task', 'past_d_check', 'already_linked', 'not_found', 'no_board', 'not_authorized'].includes(e) ? t(`err.${e}` as 'err.past_d_check') : t('err.generic'))
 
   async function run<T extends { success: boolean; error?: string }>(p: Promise<T>): Promise<T | null> {
     if (busy.current) return null
@@ -333,7 +320,8 @@ export function CardMedia({ task }: { task: MediaTaskLike }) {
     </span>
   )
   if (task.media_board) {
-    if (!task.content_task_id) return chip('u', '#6B7280', t('unlinkedTag'), { 'data-media-unlinked-card': '' })
+    // QA 26 Nov 2026 (F03, F21): a Design or Video task on its own is just a task, so no "Unlinked" tag.
+    if (!task.content_task_id) return null
     const passed = AFTER_D_CHECK.includes(task.status)
     return chip('c', '#3E7BEA', passed ? t('withContent') : t('linkedTo', { name: idx.names.get(task.content_task_id) ?? '' }), { 'data-media-linked': task.content_task_id })
   }
