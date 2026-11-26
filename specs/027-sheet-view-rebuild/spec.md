@@ -287,3 +287,12 @@ Decisions from the owner's answers to the QA review (fixes F01–F31). They repl
 
 - Not changed yet: F22 (the "Videos · No brand" theme's name) waits for the owner. F24 (a hydration warning) could not be reproduced in 6 fresh loads.
 - **FR-QA-16** (owner, 26 Nov 2026) No Cards | List (or Board | Sheet) buttons on any view: the view tabs switch views, and a board always shows its cards. A compact list is a List view added from + View.
+- **FR-QA-17** (owner, 26 Nov 2026, fields QA) Connected fields only take values from their list. In a sheet, typing a type and pressing Enter never adds it; admins and superusers add a type by choosing "+ name" in the type list. Paste plan keeps Type (real types only, English or Arabic names) and Status (Arabic names read) and flags an unknown type instead of adding it.
+- **FR-QA-18** (QF-03, QF-04) Brand pages show the original stage names in every view; a Space, and a search result in that Space, show the Space's names.
+- **FR-QA-19** (QF-05, QF-06) Every place draws a type with its colour, icon and (in Arabic) name from Settings › Task types.
+- **FR-QA-20** (QF-07) Platform is not asked, saved or shown; Channels is the field. Old Platform values stay in the database until the owner approves removing them.
+- **FR-QA-21** (QF-08) Removing an option that tasks use asks first, with how many tasks use it. (Showing removed options on tasks was not approved.)
+- **FR-QA-22** (QF-10) Number and money fields refuse letters (money may carry a currency), read "1,5" as 1.5 and Arabic digits; dates must exist.
+- **FR-QA-23** (QF-12, QF-13) The panel shows Theme and Pillar (the theme's pillars only). Filters include Owner, Theme, Pillar, Tags and each choice field such as Channels, in English and Arabic.
+- **FR-QA-24** (QF-14, QF-15, QF-16) The task panel is fully translated and shows "11 stages" / "10 stages"; a card's spoken label names its assignees.
+- QF-01 (folder sheets showing every task) and QF-09 (option ids never reused) wait for the owner's decision.
