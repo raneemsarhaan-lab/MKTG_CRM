@@ -1008,7 +1008,9 @@
       "removed": "أُزيل المحور من الجدول."
     },
     "spaceTitle": "خطة {space}",
-    "noTheme": "بدون موضوع"
+    "noTheme": "بدون موضوع",
+    "brandSet": "البراند الآن {name}",
+    "noBrand": "بلا براند"
   },
   "inbox": {
     "button": {

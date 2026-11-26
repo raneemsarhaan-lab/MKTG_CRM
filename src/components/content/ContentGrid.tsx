@@ -212,7 +212,7 @@ export function ContentGrid(p: ContentGridProps) {
     if (row.kind === 'line') return col === 'rowNo' || col === 'pillar' || col === 'task'
     if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'clip') return ['rowNo', 'status', 'assignee'].includes(col)
-    return ['rowNo', 'type', 'status', 'media', 'assignee', 'pillar', 'doc', 'design', 'task', 'post', 'published', 'archive'].includes(col)
+    return ['rowNo', 'type', 'status', 'media', 'assignee', 'brand', 'pillar', 'doc', 'design', 'task', 'post', 'published', 'archive'].includes(col)
   }
 
   /**

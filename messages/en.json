@@ -1008,7 +1008,9 @@
       "removed": "Theme removed from the sheet."
     },
     "spaceTitle": "{space} plan",
-    "noTheme": "No theme"
+    "noTheme": "No theme",
+    "brandSet": "Brand set to {name}",
+    "noBrand": "No brand"
   },
   "inbox": {
     "button": {

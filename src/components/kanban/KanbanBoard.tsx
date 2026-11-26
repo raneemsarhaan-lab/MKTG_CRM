@@ -1412,6 +1412,7 @@ function KanbanBoardInner({
           </div>
         )}
         <ContentSheet
+          brands={brands}
           boardTasks={boardTasks}
           noThemeAdd={brandBoard && !tabSheet}
           boardFiltered={boardTab && (narrowed || scope === 'me' || activeFilterCount(filters) > 0)}

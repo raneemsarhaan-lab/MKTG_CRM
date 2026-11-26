@@ -46,6 +46,8 @@ export interface ContentApi extends SheetApi {
 }
 
 export interface ContentSheetProps {
+  /** Owner, 26 Nov 2026: the brands a task's Brand cell (and the bulk bar) can set. */
+  brands?: import('@/types/index').Brand[]
   /** Spec 027 (US2): the Board tab — the board's tasks after its own filter; every one is listed. */
   boardTasks?: import('@/types/index').Task[]
   /** QA 26 Nov 2026 (F28): a Brand page's Board tab — themes belong to a Space, so none are added here. */

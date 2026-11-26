@@ -16,6 +16,8 @@ export interface SheetTaskPatch {
   name?: string
   assignee_id?: string
   content_type_label?: string
+  /** Owner, 26 Nov 2026: set from the Brand cell; '' clears it. */
+  brand_id?: string
 }
 export interface SheetClipPatch {
   clip_no?: number | null

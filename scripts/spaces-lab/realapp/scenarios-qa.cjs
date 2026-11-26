@@ -146,5 +146,62 @@ module.exports = (EMAIL, psql, ok) => {
         } finally { psql(`delete from sheets where id in ('${sheet}', '${plainSheet}')`) }
       },
     },
+    {
+      // Owner, 26 Nov 2026: brands missing on video tasks are set from the Video Space's Sheet (Brand column).
+      id: 'qa-set-brand-from-video-sheet', as: 'admin',
+      async run({ page, go }) {
+        const t = first(`insert into tasks (id,name,brand_id,content_type_label,task_owner_id,assignee_id,initiator_role,nine_stage,status,stage_date,priority,updated_at)
+          select gen_random_uuid(), 'Lab brandless video ${rnd()}', null, 'Video', m.id, m.id, m.role, true, 'r-design', now(), 'Medium', now() from members m where m.id='${who('admin')}' returning id`)
+        psql(`insert into task_spaces (task_id, space_id, added_via) values ('${t}', '${space('video')}', 'manual') on conflict do nothing`)
+        const want = psql(`select id || '|' || name from brands order by name desc limit 1`).split('|')
+        try {
+          await go('/spaces/video?view=sheet')
+          await page.waitForSelector('[data-add-field]', { timeout: 60000 })
+          if (!(await page.$('[data-col-head="brand"], [data-brand-cell]'))) {
+            await page.click('[data-add-field]')
+            await page.waitForSelector('[data-add-section="standard"] [data-add-item="brand"] [data-add-do]', { timeout: 20000 })
+            await page.click('[data-add-section="standard"] [data-add-item="brand"] [data-add-do]')
+            await page.waitForTimeout(1500)
+            await page.keyboard.press('Escape')
+          }
+          const cell = `[data-cell="k:${t}|brand"]`
+          await page.waitForSelector(cell, { timeout: 60000 })
+          await page.click(cell)
+          const opts = page.locator('[role="option"], [role="menuitemradio"], [role="menuitem"]')
+          await opts.first().waitFor({ timeout: 10000 })
+          ok(await opts.filter({ hasText: 'No brand' }).count() === 1, 'the Brand cell opens a list of brands, with No brand')
+          await opts.filter({ hasText: want[1] }).first().click()
+          await page.waitForTimeout(2500)
+          ok(psql(`select coalesce(brand_id::text, '-') from tasks where id='${t}'`) === want[0], `the task now has the brand ${want[1]}`)
+        } finally { drop([t]) }
+      },
+    },
+    {
+      // Owner, 26 Nov 2026: many rows at once — select them, then Brand in the bar at the bottom.
+      id: 'qa-set-brand-on-many-rows', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd()
+        const mk = i => {
+          const id = first(`insert into tasks (id,name,brand_id,content_type_label,task_owner_id,assignee_id,initiator_role,nine_stage,status,stage_date,priority,updated_at)
+            select gen_random_uuid(), 'Lab bulk brand ${n} ${i}', null, 'Video', m.id, m.id, m.role, true, 'r-design', now(), 'Medium', now() from members m where m.id='${who('admin')}' returning id`)
+          psql(`insert into task_spaces (task_id, space_id, added_via) values ('${id}', '${space('video')}', 'manual') on conflict do nothing`)
+          return id
+        }
+        const ids = [mk(1), mk(2), mk(3)]
+        const want = psql(`select id || '|' || name from brands order by name desc limit 1`).split('|')
+        try {
+          await go('/spaces/video?view=sheet')
+          await page.waitForSelector(`[data-cell="k:${ids[0]}|title"]`, { timeout: 60000 })
+          await page.click(`[data-cell="k:${ids[0]}|title"]`)
+          await page.click(`[data-cell="k:${ids[2]}|title"]`, { modifiers: ['Shift'] })
+          await page.waitForSelector('[data-bulk-bar] [data-bulk="brand"]', { timeout: 10000 })
+          await page.click('[data-bulk-bar] [data-bulk="brand"]')
+          await page.locator('[data-bulk-bar] button, [data-bulk-bar] [role="menuitem"]').filter({ hasText: want[1] }).first().click()
+          await page.waitForTimeout(3000)
+          const set = psql(`select count(*) from tasks where id in ('${ids.join("','")}') and brand_id='${want[0]}'`)
+          ok(set === '3', `all three rows now have ${want[1]}: ${set}`)
+        } finally { drop(ids) }
+      },
+    },
   ]
 }

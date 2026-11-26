@@ -510,6 +510,23 @@ export function ContentSheet(p: ContentSheetProps) {
           closePopup(true)
           void p.api.update(task.id, { assignee_id: id }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
         }))
+      case 'brand': {
+        // Owner, 26 Nov 2026: a task's brand is set from the sheet too (it was shown only).
+        if (isClip || !p.brands?.length) return
+        if (!can) { onNote(`${row.key}|brand`, t('readOnly')); return }
+        const choose = (id: string) => () => {
+          closePopup(true)
+          const old = task.brand_id ?? ''
+          void p.api.update(task.id, { brand_id: id }).then(r => {
+            if (!r.success) { say(t('notSaved', { reason: why(r.error) })); return }
+            say(t('brandSet', { name: p.brands!.find(b => b.id === id)?.name ?? t('noBrand') }), () => void p.api.update(task.id, { brand_id: old }))
+          })
+        }
+        return menu(t('col.brand'), [
+          ...p.brands.map(b => ({ key: b.id, text: b.name, label: b.name, tone: b.id === task.brand_id ? ('next' as const) : undefined, onSelect: choose(b.id) })),
+          { key: '', text: t('noBrand'), label: t('noBrand'), tone: !task.brand_id ? ('next' as const) : undefined, onSelect: choose('') },
+        ])
+      }
       case 'type':
         if (!can) { onNote(`${row.key}|type`, t('readOnly')); return }
         return cl.typeCombo(task, anchor, p.contentTypes, label => setType(task, label))
@@ -956,14 +973,14 @@ export function ContentSheet(p: ContentSheetProps) {
         <BulkBar
           count={bulkTasks.length}
           selectedBrands={bulkTasks.map(x => x.brand)}
-          fields={['stage', 'assignee', 'type', 'pillar', 'due']}
+          fields={p.brands?.length ? ['stage', 'assignee', 'brand', 'type', 'pillar', 'due'] : ['stage', 'assignee', 'type', 'pillar', 'due']}
           labels={{
-            count: t('bulk.count', { n: bulkTasks.length }), stage: t('bulk.stage'), assignee: t('bulk.assignee'), type: t('bulk.type'),
+            count: t('bulk.count', { n: bulkTasks.length }), stage: t('bulk.stage'), assignee: t('bulk.assignee'), type: t('bulk.type'), brand: t('col.brand'), noBrand: t('noBrand'),
             pillar: t('bulk.pillar'), due: t('bulk.date'), remove: t('bulk.archive'), confirm: t('bulk.archiveConfirm', { n: bulkTasks.length }),
             cancel: t('bulk.cancel'), clear: t('bulk.clear'), setDue: t('bulk.setDue'), noPillar: t('bulk.noPillar'), pillarOff: t('bulk.pillarOff'), saving: t('bulk.saving'),
           }}
           members={p.members}
-          brands={[]}
+          brands={p.brands ?? []}
           types={p.contentTypes.map(c => ({ ...c } as unknown as import('@/types/index').ContentType))}
           busy={bulkBusy}
           note=""
