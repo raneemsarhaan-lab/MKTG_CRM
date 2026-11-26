@@ -6,6 +6,7 @@
  * pillars group pieces; every row is a task, moved by the board's own rules.
  * Paste plan brings the Content Library Google Sheet in.
  */
+import { useAddLabel } from '@/components/spaces/addLabel'
 import { useAddColumn } from '@/components/fields/useAddColumn'
 import { setMyColumns } from '@/actions/fields'
 import { fieldOnIn } from '@/lib/field-catalog'
@@ -447,7 +448,7 @@ export function ContentSheet(p: ContentSheetProps) {
           save: async name => { const r = rowsOn ? await p.api.addPillarAt!(th.id, name) : await p.api.savePillar(th.id, { name }); if (!r.success) return why(r.error); closePopup(true); say(t('pillar.saved')); return null },
         }) })
       }
-      if (rowsOn || mayAdd(th)) items.push({ key: 'piece', text: rowsOn ? t('rows.add') : t('addPiece'), label: rowsOn ? t('rows.add') : t('addPiece'), onSelect: pick(() => addPiece(th, null)) })
+      if (rowsOn || mayAdd(th)) items.push({ key: 'piece', text: rowsOn ? addRowWord : t('addPiece'), label: rowsOn ? addRowWord : t('addPiece'), onSelect: pick(() => addPiece(th, null)) })
       if (rowsOn && admin) {
         items.push({ key: 'thAbove', text: t('themes.insertAbove'), label: t('themes.insertAbove'), onSelect: () => void openThemeAdd(anchor, { projectId: th.id, where: 'above' }) })
         items.push({ key: 'thBelow', text: t('themes.insertBelow'), label: t('themes.insertBelow'), onSelect: () => void openThemeAdd(anchor, { projectId: th.id, where: 'below' }) })
@@ -460,7 +461,7 @@ export function ContentSheet(p: ContentSheetProps) {
     if (row.kind === 'pillar') {
       const th = row.theme, pl = row.pillar
       const items: MenuItem[] = []
-      if (rowsOn || mayAdd(th)) items.push({ key: 'piece', text: rowsOn ? t('rows.add') : t('addPiece'), label: rowsOn ? t('rows.add') : t('addPiece'), onSelect: pick(() => addPiece(th, pl.id)) })
+      if (rowsOn || mayAdd(th)) items.push({ key: 'piece', text: rowsOn ? addRowWord : t('addPiece'), label: rowsOn ? addRowWord : t('addPiece'), onSelect: pick(() => addPiece(th, pl.id)) })
       if (rowsOn && mayEditTheme(th)) {
         for (const where of ['above', 'below'] as const) {
           items.push({ key: `pl-${where}`, text: t(where === 'above' ? 'pillar.insertAbove' : 'pillar.insertBelow'), label: t(where === 'above' ? 'pillar.insertAbove' : 'pillar.insertBelow'), onSelect: () => setPopup({
@@ -687,6 +688,8 @@ export function ContentSheet(p: ContentSheetProps) {
   const [fbarSlot, setFbarSlot] = useState<HTMLElement | null>(null)
   // Simple sheet header (25 Nov 2026): "+ Post ▾" in the workbook's toolbar row — the page's own add, and
   // ▾ for + Theme, + Column and Paste plan (and + Add existing task in an added tab).
+  // QA 26 Nov 2026 (F15): the Space's own word ("+ New post") in the theme and pillar menus too.
+  const addRowWord = useAddLabel(t('rows.add'))
   const sheetBar = useSheetBar()
   const pageChrome = useViewChrome()
   const [addMenu, setAddMenu] = useState<HTMLElement | null>(null)
@@ -711,7 +714,7 @@ export function ContentSheet(p: ContentSheetProps) {
           // No page add here (a Brand page, or no right to add): one "+ Add ▾" for the same menu.
           : <span className="fx-sheetbar-split is-solo" data-sheet-add="">
               <button type="button" className="fx-sheetbar-addmain" data-sheet-add-more="" aria-haspopup="menu" aria-expanded={!!addMenu}
-                onClick={e => { const el = e.currentTarget; setAddMenu(m => (m ? null : el)) }}>＋ {ts('view.addSolo')} <span aria-hidden="true">▾</span></button>
+                onClick={e => { const el = e.currentTarget; setAddMenu(m => (m ? null : el)) }}>＋ {tSp('config.newLabelDefault')} <span aria-hidden="true">▾</span></button>
             </span>,
         sheetBar.add)}
       {addMenu && (

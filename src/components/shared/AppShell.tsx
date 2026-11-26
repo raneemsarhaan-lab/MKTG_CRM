@@ -10,6 +10,7 @@ import { NotifyProvider } from '@/components/notifications/NotifyProvider'
 import { notifyApi } from '@/components/notifications/api'
 import { HoursReminderApp } from '@/components/hours/pages'
 import { useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
 
 interface AppShellProps {
@@ -43,6 +44,7 @@ interface AppShellProps {
 export function AppShell({ member, pins = [], tree = null, children }: AppShellProps) {
   // The member's own choice; celebrations stay off until they turn them on.
   const on = !!member.celebrations
+  const skipText = useTranslations('nav')('skipToContent')
   useEffect(() => { useUIStore.getState().setCelebrationsOn(on) }, [on])
   return (
     // The notifications' pulse, toasts and opening (spec 012), once for the app.
@@ -54,9 +56,11 @@ export function AppShell({ member, pins = [], tree = null, children }: AppShellP
       minHeight: '100dvh',
       display: 'flex', background: '#FFFFFF',
     }}>
+      {/* QA 26 Nov 2026 (F20): the first Tab offers "Skip to content". */}
+      <a href="#main-content" className="fx-skip" data-skip-link="">{skipText}</a>
       <Sidebar member={member} pins={pins} tree={tree} />
 
-      <main style={{ flex: 1, minWidth: 0 }}>{children}</main>
+      <main id="main-content" tabIndex={-1} style={{ flex: 1, minWidth: 0, outline: 'none' }}>{children}</main>
 
       {/* Rendered always, shown only at phone widths. */}
       <TabBar member={member} pins={pins} tree={tree} />

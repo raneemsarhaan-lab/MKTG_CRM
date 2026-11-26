@@ -9,7 +9,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
-export function ViewMenu({ showWeek, onShowWeek, upstream, onUpstream }: {
+export function ViewMenu({ showWeek, onShowWeek, upstream, onUpstream, byBrand, onByBrand }: {
+  /** QA 26 Nov 2026 (F13): "Group by brand" on boards with more than one brand. */
+  byBrand?: boolean
+  onByBrand?(v: boolean): void
   showWeek: boolean
   onShowWeek(v: boolean): void
   upstream: boolean
@@ -38,7 +41,7 @@ export function ViewMenu({ showWeek, onShowWeek, upstream, onUpstream }: {
     else if (e.key === 'Tab') setOpen(false)
   }
 
-  const item = (key: 'week' | 'upstream', on: boolean, set: (v: boolean) => void) => (
+  const item = (key: 'week' | 'upstream' | 'byBrand', on: boolean, set: (v: boolean) => void) => (
     <button type="button" role="menuitemcheckbox" aria-checked={on} className="fx-view-item" data-view={key}
             onClick={() => set(!on)}>
       <span>{t(`view.${key}`)}</span>
@@ -60,6 +63,7 @@ export function ViewMenu({ showWeek, onShowWeek, upstream, onUpstream }: {
         <div className="fx-view-menu" role="menu" aria-label={t('view.menu')}>
           {item('week', showWeek, onShowWeek)}
           {item('upstream', upstream, onUpstream)}
+          {onByBrand && item('byBrand', !!byBrand, onByBrand)}
         </div>
       )}
     </div>

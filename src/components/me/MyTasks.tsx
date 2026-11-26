@@ -7,6 +7,7 @@
  * Handed off. The List groups them as Working on, Handed off · I own it,
  * Planning and Published.
  */
+import { useFavourite } from '@/components/views/simple-head'
 import { setWorkWeekend } from '@/lib/utils'
 import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
@@ -42,6 +43,7 @@ export function MyTasks({ data }: { data: BoardData }) {
     return show === 'assigned' ? assigned : show === 'handed' ? handed : assigned || handed
   }, [me, show])
   const tasks = viewTasks(data).filter(x => !x.dropped_at && scope(x))
+  const fav = useFavourite({ href: '/me', label: t('title') }, data.favourites)
   const open = (id: string) => selectTask(id)
   // Spec 023: custom fields and their values, for List rows.
   const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
@@ -65,6 +67,8 @@ export function MyTasks({ data }: { data: BoardData }) {
 
   return (
     <ViewHost
+      // QA 26 Nov 2026 (F25): the same breadcrumb header as Spaces and Brands — My work / My tasks ☆.
+      simple={{ crumbs: [{ label: ts('me'), icon: null }, { label: t('title'), icon: null }], favourite: fav, settings: null, add: null }}
       crumbs={[ts('me'), t('title')]}
       title={t('title')}
       tag={t('tag')}

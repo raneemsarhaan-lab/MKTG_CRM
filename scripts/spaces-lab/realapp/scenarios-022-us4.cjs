@@ -111,9 +111,9 @@ module.exports = (EMAIL, psql, ok) => {
           await page.keyboard.press('Enter')
           await page.waitForTimeout(2500)
           ok(psql(`select status from tasks where id='${t}'`) === 'c-final', 'typing a Space name (an alias) moves it')
+          // QA 26 Nov 2026 (F08): there is no all-tasks board any more; its address opens a Space instead.
           await go('/board')
-          await page.waitForSelector('[aria-label="C-In Progress column"]', { timeout: 60000 })
-          ok(!(await page.$('[data-space-stage]')) && !(await page.$('[aria-label="Writing column"]')), 'the main board keeps the original names')
+          ok(!new URL(page.url()).pathname.startsWith('/board'), `the old board's address redirects, now at ${new URL(page.url()).pathname}`)
         } finally { psql(`delete from tasks where id='${t}'`); psql(`delete from projects where id='${theme}'`); clearStages('content') }
       },
     },

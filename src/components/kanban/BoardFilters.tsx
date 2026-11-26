@@ -256,6 +256,9 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
   const usedTypes = useMemo(
     () => [...new Set(tasks.filter(t => featureOn(t.brand, 'type')).map(t => t.content_type_label).filter(Boolean))].sort(),
     [tasks])
+  // QA 26 Nov 2026 (F13): Brand is a Standard field — filter by it wherever more than one brand is in view.
+  const usedBrands = useMemo(() => [...new Map(tasks.filter(t => t.brand_id && t.brand).map(t => [t.brand_id as string, (t.brand as { name: string }).name])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1])), [tasks])
   const usedPlatforms = useMemo(
     () => [...new Set(tasks.filter(t => featureOn(t.brand, 'platform')).map(t => t.platform).filter((p): p is string => Boolean(p)))].sort(),
     [tasks])
@@ -267,7 +270,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
   const memberName = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
 
   const count = activeFilterCount(filters)
-  const behindButton = count - (filters.brandIds.length ? 1 : 0) - (filters.search.trim() ? 1 : 0)
+  const behindButton = count - (filters.search.trim() ? 1 : 0)
 
   const pp = filters.publishPreset ?? 'any'
   const publishText = pp !== 'any'
@@ -313,6 +316,15 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           ))}
         </PillSection>
 
+        {usedBrands.length > 1 && <PillSection label="Brand">
+          {usedBrands.map(([id, name]) => (
+            <PillOption key={id} selected={filters.brandIds.includes(id)} pressed={filters.brandIds.includes(id)}
+                        onClick={() => toggle('brandIds', id)} data-filter-brand={id}>
+              <Check on={filters.brandIds.includes(id)} /> {name}
+            </PillOption>
+          ))}
+        </PillSection>}
+
         {usedTypes.length > 0 && <PillSection label="Content type">
           {usedTypes.map(v => (
             <PillOption key={v} selected={filters.contentTypes.includes(v)} pressed={filters.contentTypes.includes(v)}
@@ -322,7 +334,8 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           ))}
         </PillSection>}
 
-        {usedPlatforms.length > 0 && (
+        {/* QA 26 Nov 2026 (F13): Platform is retired behind Channels — no longer offered here (values kept). */}
+        {false && usedPlatforms.length > 0 && (
           <PillSection label="Platform">
             {usedPlatforms.map(v => (
               <PillOption key={v} selected={filters.platforms.includes(v)} pressed={filters.platforms.includes(v)}
@@ -387,9 +400,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
         </PillSection>
 
         <PillSection label="Only">
-          <PillOption selected={filters.onlyMine} pressed={filters.onlyMine} onClick={() => set('onlyMine', !filters.onlyMine)}>
-            <Check on={filters.onlyMine} /> My tasks
-          </PillOption>
+          {/* QA 26 Nov 2026 (F12): "My tasks" is the avatar Mine button now. */}
           <PillOption selected={filters.withAttachments} pressed={filters.withAttachments} onClick={() => set('withAttachments', !filters.withAttachments)}>
             <Check on={filters.withAttachments} /> Has files
           </PillOption>

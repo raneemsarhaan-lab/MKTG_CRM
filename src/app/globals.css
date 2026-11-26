@@ -2548,12 +2548,12 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-hr-tbl caption { text-align: start; padding: 10px 14px; color: #5A5F6C; font-size: 12.5px; }
 .fx-hr-tbl th, .fx-hr-tbl td { padding: 10px 12px; border-top: 1px solid var(--inbox-border); text-align: center; white-space: nowrap; }
 .fx-hr-tbl thead th { background: #F8F8FB; color: #5A5F6C; font-size: 12px; font-weight: 700; border-top: 0; }
-.fx-hr-tbl thead th.is-weekend { color: #8A8F9C; }
+.fx-hr-tbl thead th.is-weekend { color: #646A79; }
 .fx-hr-tbl th[scope="row"], .fx-hr-tbl thead th:first-child { text-align: start; position: sticky; inset-inline-start: 0; background: var(--inbox-panel); color: #14131A; font-weight: 600; z-index: 1; }
 .fx-hr-tbl thead th:first-child { background: #F8F8FB; }
 .fx-hr-tbl td.is-miss { color: var(--hr-miss-ink); background: var(--hr-miss-fill); font-weight: 600; font-size: 12.5px; }
 .fx-hr-tbl td.is-off { color: var(--hr-off-ink); font-size: 12.5px; }
-.fx-hr-tbl td.is-empty { color: #8A8F9C; }
+.fx-hr-tbl td.is-empty { color: #646A79; }
 .fx-hr-tbl td.is-total { font-weight: 700; color: #14131A; }
 .fx-hr-tbl td.is-total small { color: #5A5F6C; font-weight: 500; }
 .fx-hr-tbl tfoot th, .fx-hr-tbl tfoot td { background: #F8F8FB; font-weight: 700; }
@@ -3282,7 +3282,7 @@ a.fx-pill:hover { filter: brightness(.95); }
 .fx-linkpick-opt.is-create { font-weight: 700; border-top: 1px dashed var(--line, #E5E7EB); border-radius: 0 0 8px 8px; margin-top: 2px; }
 .fx-linkpick-name { display: grid; min-width: 0; }
 .fx-linkpick-name small { font-size: 11px; color: var(--muted, #6B7280); }
-.fx-linkpick-kind { flex: none; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 1px 7px; border: 1px dashed var(--muted, #9CA3AF); color: var(--muted, #6B7280); }
+.fx-linkpick-kind { flex: none; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 1px 7px; border: 1px dashed var(--muted, #687080); color: var(--muted, #6B7280); }
 .fx-linkpick-kind.is-pipe { border-style: solid; border-color: #5B5FC7; color: #3B3F9E; }
 .fx-linkpick-none { margin: 4px 8px; font-size: 12.5px; color: var(--muted, #6B7280); }
 .fx-linkpick-new { display: grid; gap: 8px; border: 1px solid var(--line, #E5E7EB); border-radius: 10px; padding: 10px; background: #FAFAF9; }
@@ -3451,7 +3451,7 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
 .fx-view-tab-btn:disabled { cursor: default; color: #B5B8C2; }
 .fx-view-tab.is-on .fx-view-tab-btn { color: #14131A; }
 .fx-view-tab-ic { flex: none; opacity: .85; }
-.fx-view-tab-more { border: 0; background: none; cursor: pointer; color: #9AA0AC; padding: 10px 8px 12px 2px; font-size: 13px; opacity: 0; transition: opacity .12s; }
+.fx-view-tab-more { border: 0; background: none; cursor: pointer; color: #666C7B; padding: 10px 8px 12px 2px; font-size: 13px; opacity: 0; transition: opacity .12s; }
 .fx-view-tab:hover .fx-view-tab-more, .fx-view-tab.is-on .fx-view-tab-more, .fx-view-tab-more:focus-visible, .fx-view-tab-more[aria-expanded="true"] { opacity: 1; }
 @media (hover: none) { .fx-view-tab-more { opacity: 1; } }
 .fx-view-add { border: 0; background: none; cursor: pointer; font: 700 13.5px var(--font-body); color: #6B7080; padding: 10px 12px 12px; white-space: nowrap; border-radius: 10px 10px 0 0; }
@@ -3500,14 +3500,14 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
 .fx-sheet-tr.is-head.is-lettered > .fx-sheet-th { height: 58px; padding-top: 20px; }
 .is-lettered > .fx-sheet-th[data-letter]::after { height: 20px; }
 .is-lettered > .fx-sheet-th > .fx-sheet-th-name { font-size: 13px; font-weight: 600; }
-.is-frozen-no { font-size: 12px; color: #8A8F9C; }
+.is-frozen-no { font-size: 12px; color: #646A79; }
 .fx-sheet-td.is-frozen-no { background: #FFFFFF; }
 /* A rounded frame around the grid, with room around it. */
 .fx-sheet-scroll { margin: 0 16px 12px; border: 1px solid #E3E5EA; border-radius: 12px; background: #FFFFFF; }
 .fx-sheet-scroll > .fx-sheet-grid > .fx-sheet-tr > :last-child { border-inline-end-color: transparent; }
 /* Headings: the kind's symbol, quiet; the menu's ▾ always there, stronger on hover. */
-.fx-sheet-th .fx-ac-glyph { width: auto; height: auto; flex: none; background: none !important; color: #8A8F9C !important; font-size: 12px; font-weight: 700; padding: 0; margin-inline-end: 6px; border-radius: 0; }
-.fx-sheet-th .fx-fd-ic { background: none; color: #8A8F9C; }
+.fx-sheet-th .fx-ac-glyph { width: auto; height: auto; flex: none; background: none !important; color: #646A79 !important; font-size: 12px; font-weight: 700; padding: 0; margin-inline-end: 6px; border-radius: 0; }
+.fx-sheet-th .fx-fd-ic { background: none; color: #646A79; }
 .fx-sheet-th-name { display: inline-flex; align-items: center; }
 .fx-sheet-th-menu { opacity: .55; width: 20px; height: 20px; }
 .fx-sheet-th-menu::before { font-size: 12px; }
@@ -3524,7 +3524,7 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
 .fx-sheet-tr.is-video > .fx-sheet-td:not(.is-frozen-no) { font-weight: 700; }
 .fx-content-theme-name { font-size: 14px; }
 .fx-sheet-tr.fx-content-pillar-row > .fx-sheet-td:not(.is-frozen-no) { background: #FBFBFC; }
-.fx-sheet-tr.is-add > .fx-sheet-td { color: #8A8F9C; }
+.fx-sheet-tr.is-add > .fx-sheet-td { color: #646A79; }
 /* The summary line above the grid. */
 .fx-sheet-sum { background: transparent; border-bottom: 0; padding: 10px 18px 8px; font-size: 13px; }
 .fx-sheet-sum-name { font-size: 14px; }
@@ -3535,7 +3535,7 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
 .fx-fbar { height: 46px; align-items: center; gap: 8px; padding: 0 16px; border-top: 0; }
 .fx-namebox-wrap { position: relative; flex: none; display: inline-flex; align-items: center; height: 34px; }
 .fx-fbar .fx-namebox { width: 96px; height: 34px; border: 1px solid #E3E5EA; border-radius: 9px; padding-inline: 12px 24px; font-weight: 600; }
-.fx-namebox-chev { position: absolute; inset-inline-end: 9px; font-size: 11px; color: #8A8F9C; pointer-events: none; }
+.fx-namebox-chev { position: absolute; inset-inline-end: 9px; font-size: 11px; color: #646A79; pointer-events: none; }
 .fx-fbar .fx-fx { height: 34px; border: 0; width: 26px; }
 .fx-fbar .fx-cellbar { height: 34px; border: 1px solid #E3E5EA; border-radius: 9px; }
 .fx-fbar .fx-cellcount { border: 0; }
@@ -3559,18 +3559,18 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
    and "+ Post ▾" on the right. Aa shows the menus, formatting toolbar and formula bar. */
 .fx-simple-head { background: #FFFFFF; display: flex; flex-direction: column; padding: 0 22px; border-bottom: 1px solid #ECEDF0; }
 .fx-sh1 { display: flex; align-items: center; gap: 10px; min-height: 46px; }
-.fx-sh1-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; font: 500 13.5px var(--font-body); color: #7A7E89; }
+.fx-sh1-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; font: 500 13.5px var(--font-body); color: #5F6474; }
 .fx-sh1-sep { color: #C4C4C2; }
 .fx-sh1-crumb { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .fx-sh1-crumb a { color: inherit; text-decoration: none; }
 .fx-sh1-crumb a:hover { color: #14131A; text-decoration: underline; }
 .fx-sh1-crumb.is-here { color: #14131A; font-weight: 700; }
-.fx-sh1-icon-svg { flex: none; color: #9AA0AC; }
+.fx-sh1-icon-svg { flex: none; color: #666C7B; }
 .fx-sh1-brand { flex: none; width: 18px; height: 18px; border-radius: 5px; object-fit: cover; display: inline-grid; place-items: center; color: #FFFFFF; font-size: 10.5px; font-weight: 800; }
-.fx-sh1-star { border: 0; background: none; cursor: pointer; color: #A4A8B2; padding: 4px; border-radius: 6px; display: inline-grid; place-items: center; }
+.fx-sh1-star { border: 0; background: none; cursor: pointer; color: #666C7B; padding: 4px; border-radius: 6px; display: inline-grid; place-items: center; }
 .fx-sh1-star:hover { background: #F3F4F6; color: #14131A; }
 .fx-sh1-star.is-on { color: #E8A20C; }
-.fx-sh1-saved, .fx-sh1-saved .fx-sh-status { font-size: 12px; color: #9AA0AC; font-weight: 500; }
+.fx-sh1-saved, .fx-sh1-saved .fx-sh-status { font-size: 12px; color: #666C7B; font-weight: 500; }
 .fx-sh1-gap { flex: 1; }
 .fx-sh1-icon { border: 0; background: none; cursor: pointer; color: #6B7080; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; }
 .fx-sh1-icon:hover, .fx-sh1-icon[aria-expanded="true"] { background: #F3F4F6; color: #14131A; }
@@ -3614,3 +3614,10 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
 }
 .fx-sh1-actions { display: flex; align-items: center; gap: 8px; }
 .fx-simple-head [data-brand-sections] { padding: 2px 0 6px; }
+
+/* QA 26 Nov 2026 (F20): "Skip to content" for keyboard users, and 44px targets on touch screens. */
+.fx-skip { position: absolute; left: 8px; top: -60px; z-index: 1000; background: #14131A; color: #FFFFFF; padding: 8px 12px; border-radius: 8px; font-weight: 600; font-size: 13px; text-decoration: none }
+.fx-skip:focus { top: 8px }
+@media (pointer: coarse) {
+  .fx-sh1-icon, .fx-sh1-star, .fx-sheetbar-icon, .fx-sheetbar-mine, .fx-sheetbar-addmain, .fx-sheetbar-addmore, .fx-view-tab-btn, .fx-view-tab-more, .fx-view-add { min-height: 44px; min-width: 44px }
+}

@@ -12,9 +12,10 @@ export const PIPE = {
   ink:          '#14131A',
   textPrimary:  '#1F2430',
   textSecondary:'#4A5061',
-  textMuted:    '#6B7280',
-  textFaint:    '#9096A3',
-  textFaintest: '#9CA3AF',
+  // QA 26 Nov 2026 (F20): every grey that carries text reads at 4.5:1 or better, on white and on the tinted columns.
+  textMuted:    '#5F6676',
+  textFaint:    '#646B7B',
+  textFaintest: '#687080',
   placeholder:  '#A2A7B4',
 
   limePrimary:  '#D6F551',

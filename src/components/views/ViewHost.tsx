@@ -13,6 +13,7 @@
  * "+ View". A saved view keeps a view type and a config (filters, group, sort,
  * Sheet fields) edited in the bar above it; its tab key is `v:<id>`.
  */
+import { SheetBarMine } from './SheetBarControls'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -98,11 +99,13 @@ interface ViewHostProps {
   noViews?: boolean
   /** The simple header, on the Sheet view (built-in or saved) of a Space, folder or brand page. */
   simple?: SimpleHeader
+  /** QA 26 Nov 2026 (F12): the page's Mine (shared with its Board and Sheet), shown on List, Calendar and Workload. */
+  mine?: { on: boolean; toggle(): void; me: { name: string; color?: string; avatar_url?: string } }
 }
 
 const pill: React.CSSProperties = { border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 9px', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: PIPE.ink, cursor: 'pointer' }
 
-export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs, sections, noViews = false, builtInFields, fieldPicker, simple }: ViewHostProps) {
+export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs, sections, noViews = false, builtInFields, fieldPicker, simple, mine }: ViewHostProps) {
   // Sheet look (25 Nov 2026): where a sheet puts its "Saved" and its tools, in this header.
   const [statusSlot, setStatusSlot] = useState<HTMLElement | null>(null)
   const [toolsSlot, setToolsSlot] = useState<HTMLElement | null>(null)
@@ -304,6 +307,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
           ) : null}
           {/* The right end: the page's Fields (Board, List, a saved view), then what the open sheet puts here (its Fields and Comments). */}
           {!isSimple && <div className="fx-view-tools">
+            {mine && ['list', 'calendar', 'workload'].includes(typeOf(open ? savedKey(open) : tab) ?? '') && <SheetBarMine me={mine.me} on={mine.on} onToggle={mine.toggle} />}
             {hasFields && fieldSetup && shown && <FieldsMenu shown={shown} setup={fieldSetup} onChange={setShown} />}
             <span ref={setToolsSlot} data-view-tools-slot="" className="fx-view-tools-slot" />
           </div>}

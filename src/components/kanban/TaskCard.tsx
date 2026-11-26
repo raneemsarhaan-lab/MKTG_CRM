@@ -407,7 +407,7 @@ export function TaskCard({
         }}
         role="button"
         tabIndex={0}
-        aria-label={`Task: ${task.name}`}
+        aria-label={task.name}
         aria-describedby={[summaryId, attributes['aria-describedby']].filter(Boolean).join(' ')}
         className="fx-focus"
         data-task-card={task.id}

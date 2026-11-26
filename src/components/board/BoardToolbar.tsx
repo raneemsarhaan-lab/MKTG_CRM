@@ -14,8 +14,11 @@ import { useTranslations } from 'next-intl'
 import type { Brand } from '@/types/index'
 import { BrandMenu } from './BrandMenu'
 import { ViewPair } from './ViewPair'
+import { SheetBarMine } from '@/components/views/SheetBarControls'
 
-export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noProject, filters, sort, view, onView, display, hideBrands = false, noViewPair = false, layoutToggle }: {
+export function BoardToolbar({ me, scope, onScope, brands, brandIds, onBrandIds, noProject, filters, sort, view, onView, display, hideBrands = false, noViewPair = false, layoutToggle }: {
+  /** QA 26 Nov 2026 (F12): who "Mine" is — the avatar button replaces Mine / Everyone. */
+  me?: { name: string; color?: string; avatar_url?: string }
   /** Spec 025: the page has its own brand filter (a Space) or is one brand (a folder, a brand page). */
   hideBrands?: boolean
   scope: 'me' | 'team'
@@ -41,13 +44,15 @@ export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noP
   const t = useTranslations('header')
   return (
     <div className="fx-hd-tools" data-toolbar="">
-      <div className="fx-hd-pair" role="group" aria-label={t('scopeLabel')}>
-        {(['me', 'team'] as const).map(v => (
-          <button key={v} type="button" aria-pressed={scope === v} data-scope={v} onClick={() => onScope(v)}>
-            {t(v === 'me' ? 'mine' : 'team')}
-          </button>
-        ))}
-      </div>
+      {me
+        ? <SheetBarMine me={me} on={scope === 'me'} onToggle={() => onScope(scope === 'me' ? 'team' : 'me')} />
+        : <div className="fx-hd-pair" role="group" aria-label={t('scopeLabel')}>
+            {(['me', 'team'] as const).map(v => (
+              <button key={v} type="button" aria-pressed={scope === v} data-scope={v} onClick={() => onScope(v)}>
+                {t(v === 'me' ? 'mine' : 'team')}
+              </button>
+            ))}
+          </div>}
       <span className="fx-hd-vr" aria-hidden="true" />
       {!hideBrands && <BrandMenu brands={brands} selected={brandIds} onChange={onBrandIds} />}
       {filters}

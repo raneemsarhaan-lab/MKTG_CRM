@@ -12,7 +12,8 @@
     "taskTypes": "Task types",
     "myTasks": "My tasks",
     "overdueN": "{n} overdue",
-    "more": "More pages"
+    "more": "More pages",
+    "skipToContent": "Skip to content"
   },
   "greeting": {
     "morning": "Good morning",
@@ -1108,7 +1109,8 @@
       "button": "View",
       "menu": "Board view",
       "week": "Show your week",
-      "upstream": "Columns before design"
+      "upstream": "Columns before design",
+      "byBrand": "Group by brand"
     }
   },
   "header": {
@@ -3164,7 +3166,7 @@
     "error": "Couldn't change the Spaces. Try again.",
     "settings": {
       "tab": "Spaces",
-      "title": "Team Spaces",
+      "title": "Spaces",
       "lede": "A team Space shows one team's work from every brand. Tasks live in their brand; a Space only lists them.",
       "add": "Add a Space",
       "name": "Name",

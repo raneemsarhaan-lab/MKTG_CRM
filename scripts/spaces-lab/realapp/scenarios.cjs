@@ -98,7 +98,9 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         await go('/board')
         ok(await page.getByRole('link', { name: 'Plan' }).count() > 0, 'nav says Plan')
-        ok(await page.getByText('Everyone', { exact: true }).count() > 0, 'toolbar says Everyone')
+        // QA 26 Nov 2026 (F12): Mine / Everyone became one avatar "Mine" button.
+        await go('/spaces/content?view=board')
+        ok(!!(await page.$('[data-scope-mine]')), 'the board has the Mine button')
         ok((await go('/team')).status() === 200, '/team still loads')
       },
     },
@@ -174,7 +176,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const name = `Lab user task ${Date.now()}`
         await go('/spaces/content?view=board')
-        await page.getByRole('button', { name: /^(Add task|New post|New design|New clip)$/ }).first().click()
+        await page.getByRole('button', { name: /^(Add task|New task|New post|New design|New clip)$/ }).first().click()
         await page.fill('input[placeholder="Task name — or paste a list"]', name)
         await page.locator('button', { hasText: /^Create Task$/i }).first().click()
         await page.waitForTimeout(2000)

@@ -9,6 +9,7 @@
  *   - Settings (admins): C-Check, fields switched off, default priority.
  * The Library (everything it has published) is still reachable by address.
  */
+import { isMine, useMineScope } from './mine-scope'
 import { setWorkWeekend } from '@/lib/utils'
 import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
@@ -110,6 +111,7 @@ export function BrandPage({ data, brandId, folder }: {
     add: null,
   } : undefined
   const simple = simpleFor()
+  const [mineScope, chooseMine] = useMineScope(`momentum.scope.brand:${brandId ?? 'none'}`)
   const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0], actions: undefined as React.ReactNode, sections }
 
   if (folder === 'assets' && brandId) {
@@ -139,6 +141,7 @@ export function BrandPage({ data, brandId, folder }: {
   }
   return (
     <ViewHost {...common} simple={simple} title={name} tag={t('brandTag')} sub={t('brandAll')}
+      mine={{ on: mineScope === 'me', toggle: () => chooseMine(mineScope === 'me' ? 'team' : 'me'), me: data.currentUser }}
       tabs={[{ key: 'board', label: tv('board') }, { key: 'sheet', label: tv('sheet') }, { key: 'calendar', label: tv('calendar') }, { key: 'list', label: tv('list') }, { key: 'workload', label: tv('workload') }]}
       node={brandId ? `brand:${brandId}` : undefined}
       initialPrefs={brandId ? cleanTabPrefs(data.viewPrefs[`brand:${brandId}`]) : undefined}
@@ -150,7 +153,9 @@ export function BrandPage({ data, brandId, folder }: {
       // The Sheet tab's own Fields (in the tabs row) sets its columns; the page's Fields is for the other views.
       builtInFields={['board', 'list', 'calendar']}
       render={(tab, view, shownKeys) => {
-        const shownTasks = view ? applyView(all, view.config, fv.valueOf) : all
+        const viewed = view ? applyView(all, view.config, fv.valueOf) : all
+        // QA 26 Nov 2026 (F12): Mine narrows List, Calendar and Workload as it does the Board.
+        const shownTasks = tab === 'board' || tab === 'sheet' || mineScope !== 'me' ? viewed : viewed.filter(x => isMine(x, data.currentUser.id))
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
         return withPanel(tab === 'sheet'

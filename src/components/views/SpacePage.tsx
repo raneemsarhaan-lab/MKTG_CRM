@@ -8,6 +8,7 @@
  * The Content and Video Spaces' Sheet tab is today's Content sheet and Video
  * sheet, unchanged (FR-012). Other Spaces get the task Sheet (TaskSheet).
  */
+import { isMine, useMineScope } from './mine-scope'
 import { setWorkWeekend } from '@/lib/utils'
 import { useMemo } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
@@ -90,6 +91,8 @@ export function SpacePage({ data, spaceId, brandId = null }: {
 
   // Simple sheet header (user, 25 Nov 2026): Spaces / Content / [logo] Forefront ☆, the settings icon, "+ Post".
   const [settingsOpen, setSettingsOpen] = useStateSH(false)
+  // QA 26 Nov 2026 (F12): one Mine for the page — the Board's, the Sheet's, the List's and the Calendar's.
+  const [mineScope, chooseMine] = useMineScope(`momentum.scope.${spaceId}`)
   const fav = useFavourite({ href: folderBrand ? `/spaces/${space.key}/${folderBrand.id}` : `/spaces/${space.key}`, label: folderBrand ? `${label} · ${brandShort(folderBrand)}` : label, color: folderBrand?.color ?? space.color }, data.favourites)
   const simple = {
     crumbs: [
@@ -111,6 +114,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
     {settingsOpen && <SpaceSettingsPanel space={space} data={data} onClose={() => setSettingsOpen(false)} />}
     <ViewHost
       simple={simple}
+      mine={{ on: mineScope === 'me', toggle: () => chooseMine(mineScope === 'me' ? 'team' : 'me'), me: data.currentUser }}
       crumbs={folderBrand ? [t('teams'), label, brandShort(folderBrand)] : [t('teams'), label]}
       title={folderBrand ? `${label} · ${brandShort(folderBrand)}` : label}
       tag={folderBrand ? t('folderTag') : t('spaceTag')}
@@ -140,7 +144,8 @@ export function SpacePage({ data, spaceId, brandId = null }: {
       lead={data.currentUser.access !== 'user'}
       render={(tab, view, shownKeys) => {
         // A saved view narrows the Space's tasks by its filters and orders them by its sort.
-        const shownTasks = view ? applyView(tasks, view.config, fv.valueOf) : tasks
+        const viewed = view ? applyView(tasks, view.config, fv.valueOf) : tasks
+        const shownTasks = tab === 'list' || tab === 'calendar' || view?.type === 'list' || view?.type === 'calendar' ? (mineScope === 'me' ? viewed.filter(x => isMine(x, data.currentUser.id)) : viewed) : viewed
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         const inView = ids ? (x: Task) => scope(x) && ids.has(x.id) : scope
         if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={inView} spaceId={spaceId} defaultBrandId={folderBrand?.id ?? null} />

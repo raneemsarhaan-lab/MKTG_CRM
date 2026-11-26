@@ -47,7 +47,8 @@ module.exports = (EMAIL, psql, ok) => {
         const theirs = task(`Lab theirs ${n}`, who('content'), b)
         try {
           await go('/spaces/content?view=board')
-          await page.waitForSelector('[data-scope="me"]', { timeout: 30000 })
+          // QA 26 Nov 2026 (F12): Mine is the avatar button on every view.
+          await page.waitForSelector('[data-scope-mine]', { timeout: 30000 })
           await scopeTo(page, 'me')
           ok(await page.$(`[data-task-card="${mine}"]`) !== null, 'Mine: my task is on the board')
           ok(await page.$(`[data-task-card="${theirs}"]`) === null, "Mine: someone else's task is not on the board")

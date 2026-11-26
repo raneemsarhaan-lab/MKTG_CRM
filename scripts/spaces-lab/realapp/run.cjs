@@ -60,6 +60,13 @@ async function signIn(browser, who) {
       return click(item, opts)
     }
     if (typeof sel === 'string' && MOVED[sel] && !(await page.$(sel)) && (await page.$('[data-sheet-add-more]'))) return viaMenu('[data-sheet-add-more]', `[data-menu-item="${MOVED[sel]}"]`)
+    // QA 26 Nov 2026 (F12): Mine / Everyone is one avatar button; a click on the old pair sets it.
+    const scopeWant = typeof sel === 'string' && /\[data-scope="(me|team)"\]$/.exec(sel)
+    if (scopeWant && !(await page.$(sel)) && (await page.$('[data-scope-mine]'))) {
+      const on = (await page.getAttribute('[data-scope-mine]', 'aria-pressed')) === 'true'
+      if (on !== (scopeWant[1] === 'me')) await click('[data-scope-mine]', opts)
+      return
+    }
     // The Space's Settings and the Fields button are in the header's settings icon menu on the Sheet view.
     const IN_SETTINGS = { '[data-space-settings-open]': 'settings', '[data-fields-btn]': 'fields' }
     if (IN_SETTINGS[sel] && !(await page.$(sel)) && (await page.$('[data-page-settings]'))) return viaMenu('[data-page-settings]', `[data-tab-option="${IN_SETTINGS[sel]}"]`)

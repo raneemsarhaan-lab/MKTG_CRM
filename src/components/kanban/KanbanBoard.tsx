@@ -1,5 +1,7 @@
 'use client'
 
+import { BrandGroupProvider } from '@/components/spaces/brandGroup'
+import { useMineScope } from '@/components/views/mine-scope'
 import { spaceSheetId } from '@/lib/sheet-columns'
 import { AddLabelProvider } from '@/components/spaces/addLabel'
 import { newTaskLabel, rangeOf, typesForSpace } from '@/lib/space-settings'
@@ -433,17 +435,13 @@ function KanbanBoardInner({
   // is already the narrowing — and remembers its own choice apart from /board.
   // Spec 027 (US2): a Space or brand page's Board view and its sheet's Board tab share one choice.
   const scopeKey = pageKey ? `momentum.scope.${pageKey}` : hosted ? 'momentum.view.scope' : 'momentum.board.scope'
-  const [scope, setScope] = useState<'me' | 'team'>(hosted || pageKey ? 'team' : 'me')
-  useEffect(() => {
-    try {
-      const v = window.localStorage.getItem(scopeKey)
-      if (v === 'team' || v === 'me') setScope(v)
-    } catch { /* private mode */ }
-  }, [scopeKey])
-  function chooseScope(next: 'me' | 'team') {
-    setScope(next)
-    try { window.localStorage.setItem(scopeKey, next) } catch { /* private mode */ }
-  }
+  // QA 26 Nov 2026 (F13): group a column's cards by brand (Display options), remembered per page.
+  const byBrandKey = `momentum.byBrand.${pageKey ?? 'board'}`
+  const [byBrand, setByBrand] = useState(false)
+  useEffect(() => { try { setByBrand(window.localStorage.getItem(byBrandKey) === '1') } catch { /* private mode */ } }, [byBrandKey])
+  const chooseByBrand = (v: boolean) => { setByBrand(v); try { window.localStorage.setItem(byBrandKey, v ? '1' : '0') } catch { /* private mode */ } }
+  // QA 26 Nov 2026 (F12): the same Mine as the page's List and Calendar views (useMineScope).
+  const [scope, chooseScope] = useMineScope(scopeKey, hosted || pageKey ? 'team' : 'me')
 
   /**
    * How a column orders its own cards (spec: multiple sort options,
@@ -477,6 +475,8 @@ function KanbanBoardInner({
     [tasks, scopeTasks],
   )
 
+  // QA 26 Nov 2026 (F13): how many brands the page's tasks span (group by brand needs two or more).
+  const brandsInView = useMemo(() => new Set(liveTasks.map(t => t.brand_id).filter(Boolean)).size, [liveTasks])
   const scopedTasks = useMemo(
     () => (scope === 'me'
       ? liveTasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id || !!t.assignee_ids?.includes(currentUser.id))
@@ -1170,7 +1170,8 @@ function KanbanBoardInner({
     : showUpstream
       ? ALL_STAGES
       : ALL_STAGES.filter(id => !(UPSTREAM_STAGES as string[]).includes(id))
-  const addLabel = viewSpace ? newTaskLabel(viewSpace.settings, boardLocale, '') || undefined : undefined
+  // QA 26 Nov 2026 (F15): the Space's own word for a new task; "New task" where there's no Space or none set.
+  const addLabel = newTaskLabel(viewSpace?.settings, boardLocale, tSpaces('config.newLabelDefault'))
 
   /* Stacked, an empty stage is a heading with nothing beneath it.
    *
@@ -1390,6 +1391,7 @@ function KanbanBoardInner({
         {boardTab && !sheetBar && (
           <div className="fx-board-tab-bar" data-board-tab-filters="">
             <BoardToolbar
+            me={currentUser}
               scope={scope} onScope={chooseScope} brands={brands}
               hideBrands={!!spaceId || !!boardKey?.startsWith('brand:')}
               brandIds={filters.brandIds} onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
@@ -1456,6 +1458,7 @@ function KanbanBoardInner({
       <div className="fx-hd-wrap">
         {!hosted && header}
         <BoardToolbar
+            me={currentUser}
           scope={scope}
           onScope={chooseScope}
           brands={brands}
@@ -1474,6 +1477,8 @@ function KanbanBoardInner({
               onShowWeek={v => void savePrefs({ showWeek: v })}
               upstream={showUpstream}
               onUpstream={setUpstream}
+              byBrand={byBrand}
+              onByBrand={brandsInView > 1 ? chooseByBrand : undefined}
             />
           }
         />
@@ -1542,7 +1547,7 @@ function KanbanBoardInner({
             <ListView tasks={filteredTasks as never} brands={brands} members={members} slaConfig={slaConfig} today={today}
               spaceStages={ss ?? null} onOpen={id => selectTask(id)} />
           </div>
-        ) : <div className="fx-board-cols" style={{
+        ) : <BrandGroupProvider value={byBrand && brandsInView > 1}><div className="fx-board-cols" style={{
           display: 'grid', gridAutoFlow: 'column', gridAutoColumns: '244px',
           gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
           minWidth: 0, padding: '0 26px 16px 38px',
@@ -1592,7 +1597,7 @@ function KanbanBoardInner({
               />
             )
           })}
-        </div>}
+        </div></BrandGroupProvider>}
 
         {/* The dragged card itself — a sortable item does not follow the
             pointer across columns, the overlay does. */}
