@@ -34,8 +34,15 @@ export function normalize(s: string): string {
     .toLowerCase()
 }
 
-/** The words of a text, normalised. */
-export const words = (s: string | null | undefined): string[] => (s ? normalize(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean) : [])
+/**
+ * QA 26 Nov 2026 (F14): the Arabic article and the joined forms before it (ال، وال، بال، كال، فال، لل) are
+ * left out of a word, in the search and in the titles alike, so "حملة" finds "إطلاق الحملة".
+ */
+const AR_ARTICLE = /^(?:وال|بال|كال|فال|لل|ال)(?=[\u0621-\u064A]{2,})/
+export const unArticle = (w: string): string => w.replace(AR_ARTICLE, '')
+
+/** The words of a text, normalised (the Arabic article left out). */
+export const words = (s: string | null | undefined): string[] => (s ? normalize(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean).map(unArticle) : [])
 
 const LATIN = /^[a-z0-9]+$/
 
