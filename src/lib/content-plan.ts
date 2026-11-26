@@ -30,6 +30,8 @@ const STATUS_INDEX: Map<string, StageId> = (() => {
   for (const id of Object.keys(STAGE_META) as StageId[]) {
     m.set(norm(id), id)
     m.set(norm(STAGE_META[id].label_en), id)
+    // QA 26 Nov 2026 (QF-11): the Arabic stage names read too.
+    m.set(norm(STAGE_META[id].label_ar), id)
     m.set(norm(CONTENT_STAGE_WORDS[id]), id)
     for (const w of VIDEO_STAGE_WORDS[id] ?? []) m.set(norm(w), id)
   }

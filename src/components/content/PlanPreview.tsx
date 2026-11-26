@@ -130,7 +130,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   const existing = rows.filter(r => r.kind === 'existing')
   const problems = rows.filter(r => r.kind === 'problem')
   // Rows that will be added, but with a cell left empty: shown so they can be fixed.
-  const warnings = rows.filter(r => r.kind !== 'problem' && r.kind !== 'existing' && r.problems.some(p => p.code === 'badLink'))
+  const warnings = rows.filter(r => r.kind !== 'problem' && r.kind !== 'existing' && r.problems.some(p => p.code === 'badLink' || p.code === 'unknownType'))
   const badValues = rows.filter(r => r.kind !== 'problem' && !fixes[r.index]?.leftOut && r.problems.some(p => p.code === 'badValue'))
   const pieces = [...fresh, ...linked.filter(r => !r.otherTheme || fixes[r.index]?.move)]
   // Pieces already in the sheet go too when they bring values: their empty cells are filled.
@@ -157,6 +157,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
       case 'noTitle': return t('problem.noTitle')
       case 'badLink': return t('problem.badLink', { column: t(`links.${p.column}`) })
       case 'badStatus': return t('problem.badStatus', { status: p.status })
+      case 'unknownType': return t('problem.unknownType', { type: p.text })
       case 'missingTask': return t('problem.missingTask')
       case 'unknownOwner': return t('problem.unknownOwner', { name: p.name })
       case 'newThemeAdmin': return t('problem.newThemeAdmin', { name: p.name })
@@ -347,7 +348,11 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
                     {warnings.map(r => (
                       <tr key={r.index} data-plan-row={r.index}>
                         <td>{r.title}</td>
-                        <td className="fx-content-problem">{r.problems.filter(p => p.code === 'badLink').map(p => `${problemText(p)}: “${r.badLinks[(p as { column: LinkColumn }).column]}”`).join(' · ')}</td>
+                        <td className="fx-content-problem">{[
+                          ...r.problems.filter(p => p.code === 'badLink').map(p => `${problemText(p)}: “${r.badLinks[(p as { column: LinkColumn }).column]}”`),
+                          // QA 26 Nov 2026 (QF-11): a type that isn't one of the task types is left empty.
+                          ...r.problems.filter(p => p.code === 'unknownType').map(p => problemText(p)),
+                        ].join(' · ')}</td>
                         <td className="fx-content-fixes">
                           {r.problems.map(p => p.code === 'badLink' && <input key={p.column} {...linkInput(r.index, p.column)} />)}
                         </td>

@@ -69,7 +69,8 @@ export function useTaskFieldColumns(cl: Columns, o: { tasks: Task[]; canEdit(tas
   const custom: Columns['custom'] = {
     ...cl.custom,
     is: key => isField(key) || cl.custom.is(key),
-    isText: (task, key) => (isField(key) ? has(task, key) && o.canEdit(task) && fieldOf(key).kind !== 'checkbox' : cl.custom.isText(task, key)),
+    // QA 26 Nov 2026 (QF-21): a checkbox also takes typed words (yes/no, نعم/لا, true/false); a click still toggles it.
+    isText: (task, key) => (isField(key) ? has(task, key) && o.canEdit(task) : cl.custom.isText(task, key)),
     isMenu: key => (isField(key) ? false : cl.custom.isMenu(key)),
     textValue: (task, key) => (isField(key) ? text(task, key) : cl.custom.textValue(task, key)),
     cellClass: key => (isField(key) ? (['number', 'money'].includes(fieldOf(key).kind) ? 'fx-sheet-num' : '') : cl.custom.cellClass(key)),

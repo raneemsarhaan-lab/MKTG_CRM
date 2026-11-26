@@ -9,6 +9,7 @@
  * - Reading typed values for fields: a member by name, a stage by name, a
  *   priority, a date.
  */
+import { latinDigits } from '@/lib/task-fields'
 import type { SheetTaskMap, TaskField } from '@/types/index'
 import { TASK_FIELDS, WORD_FIELDS } from '@/types/index'
 import { parseDate } from '@/lib/sheet-format'
@@ -140,6 +141,7 @@ export function matchStage(text: string, stages: { id: string; names: string[] }
 export const matchPriority = (text: string, words?: Record<string, string[]>) => readPriority(text) ?? asPriority(wordValue(text, words))
 /** A typed date as yyyy-mm-dd, or null. */
 export function readDay(text: string): string | null {
-  const d = parseDate(text)
+  // QA 26 Nov 2026 (QF-10): Arabic digits read.
+  const d = parseDate(latinDigits(text))
   return d ? `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}` : null
 }

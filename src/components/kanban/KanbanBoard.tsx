@@ -75,7 +75,7 @@ import { TaskLinkNames, TaskLinksSection, linkNamesByTask, taskLinkFields } from
 import { TaskForm } from '@/components/shared/TaskForm'
 import { handoffRequest } from '@/components/handoff/request'
 import { useMoveError } from '@/components/fields/moveErrors'
-import { CardFieldsProvider } from '@/components/fields/CardFields'
+import { CardFieldsProvider, useCardFields } from '@/components/fields/CardFields'
 
 type FullTask = Task & {
   brand: Brand
@@ -252,6 +252,8 @@ function KanbanBoardInner({
   // Local drag order is intentionally discarded here — it is never persisted.
   useEffect(() => { setTasks(initialTasks) }, [initialTasks])
   const [themes, setThemes] = useState<ContentTheme[]>(initialThemes)
+  // QA 26 Nov 2026 (QF-13): choice fields (Channels…) filter by their values.
+  const cardFieldCtx = useCardFields()
   useEffect(() => { setThemes(initialThemes) }, [initialThemes])
 
 
@@ -488,9 +490,10 @@ function KanbanBoardInner({
 
   const filteredTasks = useMemo(
     () => applyBoardFilters(scopedTasks, filters, {
+      valueOf: (tid, fid) => cardFieldCtx?.values.get(tid)?.get(fid),
       currentUserId: currentUser.id, slaConfig, today,
     }),
-    [scopedTasks, filters, currentUser.id, slaConfig, today],
+    [scopedTasks, filters, currentUser.id, slaConfig, today, cardFieldCtx],
   )
 
   const tasksByStage = useMemo(() => {
@@ -1277,6 +1280,7 @@ function KanbanBoardInner({
     <TaskModal
       task={selectedTask}
       stageNameOf={hosted && spaceId && ss ? s => ss.stageName(s) : undefined}
+      themes={themes}
       sectionOrder={viewSpace?.settings.section_order}
       currentUser={currentUser}
       stages={[]}
@@ -1388,7 +1392,7 @@ function KanbanBoardInner({
     const boardTab = (!!spaceId || brandBoard) && !tabSheet
     const isMine = (t: FullTask) => (t.assignee_id ?? t.task_owner_id) === currentUser.id || !!t.assignee_ids?.includes(currentUser.id)
     const boardTasks = boardTab
-      ? applyBoardFilters(tasks.filter(t => (scopeTasks ? scopeTasks(t) : true) && (scope !== 'me' || isMine(t))), filters, { currentUserId: currentUser.id, slaConfig, today })
+      ? applyBoardFilters(tasks.filter(t => (scopeTasks ? scopeTasks(t) : true) && (scope !== 'me' || isMine(t))), filters, { currentUserId: currentUser.id, slaConfig, today, valueOf: (tid, fid) => cardFieldCtx?.values.get(tid)?.get(fid) })
       : undefined
     return (
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
@@ -1407,7 +1411,7 @@ function KanbanBoardInner({
               hideBrands={!!spaceId || !!boardKey?.startsWith('brand:')}
               brandIds={filters.brandIds} onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
               noProject={null}
-              filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} />}
+              filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} themes={themes} />}
               sort={null} view="board" onView={() => {}} display={null} noViewPair />
           </div>
         )}
@@ -1481,7 +1485,7 @@ function KanbanBoardInner({
           brandIds={filters.brandIds}
           onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
           noProject={noProject}
-          filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} />}
+          filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} themes={themes} />}
           sort={<SortMenu value={sortBy} onChange={chooseSort} onReset={resetSort} noPriority={!featureOnAny(liveTasks.map(x => x.brand), 'priorities')} />}
           view={hosted && boardLayout === 'list' ? 'sheet' : 'board'}
           onView={v => (hosted ? chooseLayout(v === 'sheet' ? 'list' : 'cards') : setView(v))}

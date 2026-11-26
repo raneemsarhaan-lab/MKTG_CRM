@@ -27,13 +27,36 @@ export function isEmpty(v: unknown): boolean {
   return false
 }
 
-function num(input: unknown): number | null {
+/** Arabic-Indic and Persian digits, and the Arabic decimal and thousands signs, as plain ones. */
+export function latinDigits(s: string): string {
+  return s.replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/٫/g, '.').replace(/٬/g, ',').replace(/[\u200e\u200f\u061c]/g, '')
+}
+
+/**
+ * QA 26 Nov 2026 (QF-10): a number as typed. Letters are refused (money may start or end with a currency:
+ * EGP, $, €, £, ج.م). A comma is a decimal point unless it groups thousands ("1,5" → 1.5, "1,200" → 1200,
+ * "1.200,5" → 1200.5). Arabic digits are read.
+ */
+function num(input: unknown, money = false): number | null {
   if (typeof input === 'number') return Number.isFinite(input) ? input : null
   if (typeof input !== 'string') return null
-  const t = input.replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[,\s]/g, '').replace(/^[A-Za-z$€£]{1,3}/, '')
-  if (!t || !/^-?\d*\.?\d+$/.test(t)) return null
+  let t = latinDigits(input).trim().replace(/\s+/g, '')
+  if (money) t = t.replace(/^(?:[A-Za-z]{3}|[$€£]|ج\.?م\.?)/i, '').replace(/(?:[A-Za-z]{3}|[$€£]|ج\.?م\.?)$/i, '')
+  if (!t || /[^\d.,-]/.test(t)) return null
+  const commas = (t.match(/,/g) ?? []).length, dots = (t.match(/\./g) ?? []).length
+  if (commas && dots) t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '')
+  else if (commas === 1 && !/^-?\d{1,3},\d{3}$/.test(t)) t = t.replace(',', '.')
+  else if (commas) { if (!/^-?\d{1,3}(,\d{3})+$/.test(t)) return null; t = t.replace(/,/g, '') }
+  if (!/^-?\d*\.?\d+$/.test(t)) return null
   const n = Number(t)
   return Number.isFinite(n) ? n : null
+}
+
+/** A real calendar day (no 31 February), as YYYY-MM-DD. */
+function realDay(y: number, m: number, d: number): string | null {
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : null
 }
 
 /** A choice by its id or its name (English or Arabic), ignoring case and spacing. */
@@ -57,14 +80,16 @@ export function parseValue(f: TaskFieldDef, input: unknown): Parsed {
       return { ok: true, value: input.replace(/\r\n/g, '\n').slice(0, MAX_TEXT) }
     }
     case 'number': case 'money': {
-      const n = num(input)
+      const n = num(input, f.kind === 'money')
       return n === null ? { ok: false, error: 'invalid' } : { ok: true, value: n }
     }
     case 'date': {
       if (typeof input !== 'string') return { ok: false, error: 'invalid' }
-      const t = input.trim()
-      const iso = /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : (() => { const m = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null })()
-      if (!iso || Number.isNaN(Date.parse(`${iso}T00:00:00Z`))) return { ok: false, error: 'invalid' }
+      // QA 26 Nov 2026 (QF-10): Arabic digits read; the day must exist (no 31 February).
+      const t = latinDigits(input).trim()
+      const a = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/), b = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/)
+      const iso = a ? realDay(+a[1], +a[2], +a[3]) : b ? realDay(+b[3], +b[2], +b[1]) : null
+      if (!iso) return { ok: false, error: 'invalid' }
       return { ok: true, value: iso }
     }
     case 'link': {

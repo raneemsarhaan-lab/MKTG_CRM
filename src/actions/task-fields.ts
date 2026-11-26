@@ -62,6 +62,16 @@ export async function createField(input: { name_en: string; name_ar?: string | n
   return { success: true, field: mapTaskField(f) }
 }
 
+/** QA 26 Nov 2026 (QF-08): how many tasks hold each option of a choice field, so removing one can warn first. */
+export async function optionUsage(fieldId: string): Promise<Record<string, number>> {
+  const me = await getSessionMember()
+  if (!me) return {}
+  const rows = await prisma.taskFieldValue.findMany({ where: { field_id: fieldId, task: { dropped_at: null } }, select: { value: true } })
+  const out: Record<string, number> = {}
+  for (const r of rows) for (const id of Array.isArray(r.value) ? r.value : [r.value]) if (typeof id === 'string') out[id] = (out[id] ?? 0) + 1
+  return out
+}
+
 /** Rename, re-option, or change kind: values that fit the new kind are converted, the rest kept as text. */
 export async function updateField(id: string, patch: { name_en?: string; name_ar?: string | null; kind?: string; options?: unknown; on_card?: boolean; switchable?: boolean; position?: number }): Promise<{ success: true; field: TaskFieldDef; kept: number } | Fail> {
   const auth = await requireTaskCreator()

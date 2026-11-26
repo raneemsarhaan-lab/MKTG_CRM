@@ -261,6 +261,8 @@ export interface TaskPatch {
   content_type_label?: string
   platform?:           string
   project_id?:         string | null
+  /** QA 26 Nov 2026 (QF-12): one of the theme's pillars; null clears it. */
+  pillar_id?:          string | null
   task_owner_id?:      string
   /** Null hands the task back to nobody. */
   assignee_id?:        string | null
@@ -316,6 +318,20 @@ export async function updateTask(
   if (patch.content_type_label !== undefined) data.content_type_label = patch.content_type_label || null
   if (patch.platform !== undefined)           data.platform           = patch.platform || null
   if (patch.project_id !== undefined)         data.project_id         = patch.project_id || null
+  // QA 26 Nov 2026 (QF-12): Pillar is one of the theme's pillars; a new theme drops a pillar that isn't its own.
+  {
+    const themeId = patch.project_id !== undefined ? patch.project_id || null : found.project_id
+    if (patch.pillar_id !== undefined) {
+      if (patch.pillar_id) {
+        const pl = await prisma.contentPillar.findUnique({ where: { id: patch.pillar_id }, select: { project_id: true } })
+        if (!pl || pl.project_id !== themeId) return { success: false, error: 'pillar_not_in_theme' }
+      }
+      data.pillar_id = patch.pillar_id || null
+    } else if (patch.project_id !== undefined && found.pillar_id) {
+      const pl = await prisma.contentPillar.findUnique({ where: { id: found.pillar_id }, select: { project_id: true } })
+      if (!pl || pl.project_id !== themeId) data.pillar_id = null
+    }
+  }
   if (patch.task_owner_id !== undefined)      data.task_owner_id      = patch.task_owner_id
   if (patch.assignee_id !== undefined)        data.assignee_id        = patch.assignee_id || null
   if (patch.cover_image_url !== undefined)    data.cover_image_url    = patch.cover_image_url.trim() || null

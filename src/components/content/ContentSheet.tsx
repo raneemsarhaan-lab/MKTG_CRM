@@ -6,6 +6,8 @@
  * pillars group pieces; every row is a task, moved by the board's own rules.
  * Paste plan brings the Content Library Google Sheet in.
  */
+import { useCardFields } from '@/components/fields/CardFields'
+import { latinDigits } from '@/lib/task-fields'
 import { useAddLabel } from '@/components/spaces/addLabel'
 import { useAddColumn } from '@/components/fields/useAddColumn'
 import { setMyColumns } from '@/actions/fields'
@@ -61,7 +63,7 @@ const KNOWN_ERRORS = ['changed_meanwhile', 'board_tab', 'already_linked', 'not_l
 
 /** "2026-11-20", "20/11/2026" or "20/11" → YYYY-MM-DD; '' clears; null when unreadable. */
 export function readDate(text: string, now = new Date()): string | null | '' {
-  const v = text.trim()
+  const v = latinDigits(text).trim()
   if (!v) return ''
   let y: number, m: number, d: number
   let r: RegExpExecArray | null
@@ -129,7 +131,9 @@ export function ContentSheet(p: ContentSheetProps) {
 
   // ── permissions ─────────────────────────────────────────────────────────
   const canEdit = useCallback((task: Task) => task.task_owner_id === me.id || task.assignee_id === me.id || !!task.assignee_ids?.includes(me.id) || admin, [me.id, admin])
-  const ctx = useMemo(() => ({ tasks: p.tasks, themes: p.themes, members: p.members, me }), [p.tasks, p.themes, p.members, me])
+  // QA 26 Nov 2026 (QF-11): pasted types are checked against the real task types.
+  const planTypes = useCardFields()?.types
+  const ctx = useMemo(() => ({ tasks: p.tasks, themes: p.themes, members: p.members, me, types: planTypes }), [p.tasks, p.themes, p.members, me, planTypes])
   const mayAdd = (theme: ContentTheme) => mayAddTo(theme, ctx)
   const mayEditTheme = (theme: ContentTheme) => admin || theme.owner_id === me.id
 

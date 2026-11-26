@@ -103,6 +103,8 @@ const CU = {
 
 interface TaskModalProps {
   task: FullTask
+  /** QA 26 Nov 2026 (QF-12): the themes and their pillars, for the Pillar field. */
+  themes?: { id: string; pillars: { id: string; name: string }[] }[]
   /** Spec 024 (§4): inside a Space, the order of the sections under the top rows. */
   sectionOrder?: string[]
   /** Spec 024 (§8): inside a Space, its own name for a stage (Editing, Edit Review…); elsewhere the original names. */
@@ -544,7 +546,7 @@ export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
   initialPreviewId, initialCommentId, initialSection, onOpenSheet,
-  spaces = [], taskSpaces = [], linksSection, dueDaysBefore = 7, stageNameOf, sectionOrder,
+  spaces = [], taskSpaces = [], linksSection, dueDaysBefore = 7, stageNameOf, sectionOrder, themes = [],
 }: TaskModalProps) {
   const tPanel = useTranslations('panel')
   const orderOf = (k: string) => { const i = sectionOrder?.indexOf(k) ?? -1; return i < 0 ? PANEL_SECTIONS.indexOf(k as never) : i }
@@ -926,7 +928,7 @@ export function TaskModal({
 
   /** A field's change, confirmed out loud once it's stored ("Due date saved"). */
   function saveField(label: string, patch: TaskPatch) {
-    return applyPatch(patch, () => say(`${label} saved`))
+    return applyPatch(patch, () => say(tPanel('saved', { label })))
   }
 
   /** Also the brief editor's "turn this line into a subtask"; its errors show at the top. */
@@ -1390,6 +1392,26 @@ export function TaskModal({
           <ShowsIn taskId={task.id} spaces={spaces} rows={taskSpaces} canEdit={canEdit} />
         </Field>
       ),
+    },
+    {
+      key: 'pillar', filled: Boolean(task.pillar_id),
+      node: (() => {
+        // QA 26 Nov 2026 (QF-12): Pillar beside Theme, listing only the theme's pillars.
+        const pillars = themes.find(th => th.id === task.project_id)?.pillars ?? []
+        if (!task.project_id) return null
+        return (
+          <Field key="pillar" icon="folder" label={tPanel('pillar')}>
+            <InlineValue
+              canEdit={canEdit && pillars.length > 0} type="select" value={task.pillar_id ?? ''}
+              display={pillars.find(p => p.id === task.pillar_id)?.name}
+              options={[{ value: '', label: tPanel('noPillar') }, ...pillars.map(p => ({ value: p.id, label: p.name }))]}
+              emptyLabel="–"
+              ariaLabel={tPanel('pillar')}
+              onCommit={v => saveField(tPanel('pillar'), { pillar_id: v || null })}
+            />
+          </Field>
+        )
+      })(),
     },
     {
       /* The project this work serves.

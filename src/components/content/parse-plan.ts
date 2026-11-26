@@ -9,6 +9,7 @@
  * reference's own headings. Pure: the DOMParser is passed in, so the rest runs
  * in Node.
  */
+import { latinDigits } from '@/lib/task-fields'
 import type { AudienceKey, FrequencyPeriod, StageId, Task, Member, ContentTheme } from '@/types/index'
 import {
   readStatus, readType, readFrequency, readAudience, taskIdFromLink, isWebLink, norm,
@@ -87,6 +88,8 @@ export type ProblemCode =
   | { code: 'unknownOwner'; name: string }
   | { code: 'newThemeAdmin'; name: string }
   | { code: 'mayNotAdd'; theme: string }
+  /** QA 26 Nov 2026 (QF-11): a pasted type that isn't one of the task types: left empty, never added. */
+  | { code: 'unknownType'; text: string }
   /** A pasted value that doesn't fit its custom column: left empty (spec 010 FR-051). */
   | { code: 'badValue'; column: string; reason: ParseCode; text: string }
 
@@ -95,6 +98,8 @@ export interface PlanRow {
   index: number
   /** QA 26 Nov 2026 (F23): the publishing date read from a date column (YYYY-MM-DD), or null. */
   date?: string | null
+  /** QA 26 Nov 2026 (QF-11): the Type cell as pasted. */
+  typeText?: string
   theme: string
   owner: string
   frequency: { count: number; period: FrequencyPeriod } | null
@@ -183,7 +188,7 @@ export function readPlan(cells: PastedCell[][], targets: PasteTarget[] = []): Re
       index: rows.length + 1,
       theme: carry.theme, owner: carry.owner,
       frequency: readFrequency(carry.frequency), audience: readAudience(carry.audience),
-      pillar: carry.pillar, title, type: readType(text('type')), status, statusText, date: readDay(text('date')),
+      pillar: carry.pillar, title, type: readType(text('type')), typeText: text('type'), status, statusText, date: readDay(text('date')),
       links, badLinks, taskId: taskIdFromLink(taskCell?.href ?? taskCell?.text), custom, problems,
     })
   }
@@ -197,6 +202,8 @@ export interface PlanContext {
   me: Pick<Member, 'id' | 'access'>
   /** The sheet's custom columns, to check pasted values (spec 010). */
   columns?: PasteValueColumn[]
+  /** QA 26 Nov 2026 (QF-11): the task types (English and Arabic names) a pasted Type must be one of. */
+  types?: { label: string; name_ar?: string | null }[]
   /** Sheet 2b: the paste adds plain rows (anyone may); these plain rows are already in the sheet. */
   plain?: { lines: { project_id: string; title: string }[] }
 }
@@ -212,6 +219,7 @@ export type Classified = PlanRow & {
 
 /** Problems that don't stop a row: the cell is left empty, or the paster owns it. */
 export function isWarning(p: ProblemCode): boolean {
+  if (p.code === 'unknownType') return true
   return p.code === 'unknownOwner' || p.code === 'badLink' || p.code === 'badValue'
 }
 
@@ -235,6 +243,18 @@ export function memberByName(name: string, members: PlanContext['members']): str
 
 /** Sorts the rows into new, matched by Task Link, already in the sheet, and rows with problems. */
 export function classifyPlan(rows: PlanRow[], ctx: PlanContext): Classified[] {
+  // QA 26 Nov 2026 (QF-11): a pasted Type is one of the real task types (English or Arabic name), else flagged.
+  if (ctx.types?.length) {
+    rows = rows.map(r => {
+      const typed = (r.typeText ?? '').trim()
+      if (!typed) return { ...r, type: null }
+      const k = norm(typed), labels = ctx.types!.map(t => t.label)
+      const byName = ctx.types!.find(t => norm(t.label) === k || (!!t.name_ar && norm(t.name_ar) === k))?.label
+      const alias = readType(typed, labels)
+      const hit = byName ?? (alias && alias !== 'Other' && labels.includes(alias) ? alias : null)
+      return hit ? { ...r, type: hit } : { ...r, type: null, problems: [...r.problems, { code: 'unknownType' as const, text: typed }] }
+    })
+  }
   const byId = new Map(ctx.tasks.map(t => [t.id, t]))
   const themeByName = new Map(ctx.themes.map(t => [norm(t.name), t]))
   const seen = new Map<string, Set<string>>()   // theme → titles in this paste
@@ -285,7 +305,7 @@ const valid = (y: number, m: number, d: number) => m >= 1 && m <= 12 && d >= 1 &
  * 24/11/26, 24/11 (this year), 24-Nov-26, 24 Nov 2026, Nov 24 2026.
  */
 export function readDay(text: string, year = new Date().getUTCFullYear()): string | null {
-  const s = text.trim().toLowerCase().replace(/,/g, ' ').replace(/\s+/g, ' ')
+  const s = latinDigits(text).trim().toLowerCase().replace(/,/g, ' ').replace(/\s+/g, ' ')
   if (!s) return null
   const full = (y: number) => (y < 100 ? 2000 + y : y)
   let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s)

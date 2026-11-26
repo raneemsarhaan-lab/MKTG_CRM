@@ -9,7 +9,7 @@
  *               Admins and superusers edit.
  * Everyone else reads both.
  */
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import type { ContentType, FieldKind, FieldOption, StageId, TaskFieldDef, TaskTypeFieldLink } from '@/types/index'
@@ -19,7 +19,7 @@ import { FIELD_KINDS, fieldName, newChoiceId } from '@/lib/task-fields'
 import { ALL_STAGES, STAGE_META } from '@/lib/stage-meta'
 import { saveTaskType } from '@/actions/task-types'
 import { createContentType } from '@/actions/settings'
-import { attachField, createField, detachField, retireField, updateField } from '@/actions/task-fields'
+import { attachField, createField, detachField, optionUsage, retireField, updateField } from '@/actions/task-fields'
 import { deleteTag, mergeTags, recolorTag, renameTag } from '@/actions/tags'
 import { TAG_COLORS } from '@/lib/tags'
 import { TypeIcon } from './TypeIcon'
@@ -388,6 +388,15 @@ function FieldEditorForm({ field, onDone }: { field?: TaskFieldDef; onDone: (msg
   const [err, setErr] = useState('')
   const [pending, start] = useTransition()
   const hasChoices = kind === 'choice' || kind === 'multi'
+  // QA 26 Nov 2026 (QF-08): removing an option that tasks use asks first, with how many.
+  const [usage, setUsage] = useState<Record<string, number>>({})
+  const [asking, setAsking] = useState<{ id: string; n: number } | null>(null)
+  useEffect(() => { if (field?.id && (field.kind === 'choice' || field.kind === 'multi')) void optionUsage(field.id).then(setUsage).catch(() => {}) }, [field?.id, field?.kind])
+  const removeChoice = (id: string) => {
+    const n = usage[id] ?? 0
+    if (n > 0 && asking?.id !== id) { setAsking({ id, n }); return }
+    setAsking(null); setChoices(cs => cs.filter(x => x.id !== id))
+  }
   const options = useMemo(() => ({
     ...(hasChoices ? { choices: choices.filter(c => c.en.trim()) } : kind === 'money' ? { currency } : kind === 'rating' ? { max: 5 } : {}),
     place, ...(field?.options.hint ? { hint: field.options.hint } : {}),
@@ -440,8 +449,15 @@ function FieldEditorForm({ field, onDone }: { field?: TaskFieldDef; onDone: (msg
                     style={{ width: 18, height: 18, borderRadius: '50%', background: col, cursor: 'pointer', border: c.color === col ? '2px solid var(--ink)' : '1px solid #fff', boxShadow: '0 0 0 1px #D9D9D3', padding: 0 }} />
                 ))}
               </span>
-              <button aria-label={tf('removeChoice', { n: i + 1 })} onClick={() => setChoices(cs => cs.filter(x => x.id !== c.id))}
+              <button aria-label={tf('removeChoice', { n: i + 1 })} onClick={() => removeChoice(c.id)} data-choice-remove={c.id}
                 style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--muted)', fontSize: '1rem' }}>×</button>
+              {asking?.id === c.id && (
+                <span role="alert" data-choice-in-use={c.id} style={{ flexBasis: '100%', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: '0.8rem', color: '#8A4B00', background: '#FFF4D6', borderRadius: 8, padding: '6px 10px' }}>
+                  {tf('choiceInUse', { n: asking.n, name: c.en || '…' })}
+                  <button type="button" style={{ ...btn(true), padding: '2px 10px', fontSize: '0.75rem' }} data-choice-remove-confirm onClick={() => removeChoice(c.id)}>{tf('choiceRemoveAnyway')}</button>
+                  <button type="button" style={{ ...btn(), padding: '2px 10px', fontSize: '0.75rem' }} onClick={() => setAsking(null)}>{tf('choiceKeep')}</button>
+                </span>
+              )}
             </div>
           ))}
           <div><button type="button" style={{ ...btn(), padding: '4px 10px', fontSize: '0.75rem' }} data-choice-add

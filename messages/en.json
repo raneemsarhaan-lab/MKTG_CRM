@@ -851,7 +851,7 @@
       "owner": "Owner",
       "links": "Links",
       "problem": "Problem",
-      "warnSection": "Cells that aren’t web addresses · left empty unless you paste a link",
+      "warnSection": "Cells left empty · links that aren’t web addresses and types that don’t exist",
       "archived": "Archived",
       "more": "Showing {shown} of {n}. All {n} are added.",
       "discardAsk": "Close and lose the pasted rows and your fixes?",
@@ -867,7 +867,8 @@
       "missingTask": "Its Task Link points to a task that doesn't exist",
       "unknownOwner": "{name} isn't on the team; you'll own it",
       "newThemeAdmin": "Only an admin can add the new theme {name}",
-      "mayNotAdd": "You can't add pieces to {theme}"
+      "mayNotAdd": "You can't add pieces to {theme}",
+      "unknownType": "Unknown type “{type}”: left empty (only admins and superusers add types)"
     },
     "readOnly": "You can only change pieces you own or are assigned to.",
     "noMoves": "Only the person holding this stage, or an admin, can move it.",
@@ -3858,7 +3859,10 @@
     "madeField": "Now a task field. {n, plural, one {# value} other {# values}} moved onto the tasks.",
     "makeFieldFailed": "Couldn't make it a task field.",
     "brandFields": "Task fields",
-    "switchedOff": "Switched off for {brand}"
+    "switchedOff": "Switched off for {brand}",
+    "choiceInUse": "{n, plural, one {# task uses} other {# tasks use}} “{name}”. Remove it anyway? Those tasks keep the value in the database.",
+    "choiceRemoveAnyway": "Remove anyway",
+    "choiceKeep": "Keep it"
   },
   "types": {
     "eyebrow": "Workspace",
@@ -4391,6 +4395,47 @@
     "addDescription": "Add a description…",
     "commentPlaceholder": "Write a comment — @ names, # links a task…",
     "linkCopied": "Link copied",
-    "empty": "Empty"
+    "empty": "Empty",
+    "pillar": "Pillar",
+    "noPillar": "No pillar",
+    "saved": "{label} saved"
+  },
+  "filters": {
+    "search": "Search",
+    "searchTasks": "Search tasks",
+    "searchPlaceholder": "Name, owner, theme…",
+    "assignee": "Assignee",
+    "owner": "Owner",
+    "brand": "Brand",
+    "type": "Type",
+    "theme": "Theme",
+    "pillar": "Pillar",
+    "tags": "Tags",
+    "priority": "Priority",
+    "sla": "SLA status",
+    "due": "Due date",
+    "publish": "Publishing date",
+    "only": "Only",
+    "hasFiles": "Has files",
+    "anyDate": "Any date",
+    "overdue": "Overdue",
+    "dueToday": "Due today",
+    "next7": "Next 7 days",
+    "noDue": "No due date",
+    "publishToday": "Publishing today",
+    "noPublish": "No publishing date",
+    "dueFrom": "Due from",
+    "dueTo": "Due to",
+    "noTheme": "No theme",
+    "noPillar": "No pillar",
+    "unknown": "Unknown",
+    "alert": {
+      "Overdue": "Overdue",
+      "Stuck": "Stuck",
+      "WillMiss": "Will Miss",
+      "AtRisk": "At Risk",
+      "Idle": "Idle",
+      "OnTrack": "On Track"
+    }
   }
 }

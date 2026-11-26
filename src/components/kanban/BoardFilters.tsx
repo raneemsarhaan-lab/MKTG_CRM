@@ -1,5 +1,8 @@
 'use client'
 
+import { useCardFields } from '@/components/fields/CardFields'
+import { TypeIcon } from '@/components/types/TypeIcon'
+import { useTypeLook } from '@/components/types/TypePill'
 import { useMemo } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { PillOption, PillInput } from '@/components/shared/FieldPill'
@@ -46,6 +49,15 @@ export interface BoardFilterState {
   publishTo?:     string
   onlyMine:       boolean
   withAttachments: boolean
+  /** QA 26 Nov 2026 (QF-13): the task's owner (who created it), apart from who is doing it. */
+  creatorIds?:    string[]
+  tagIds?:        string[]
+  /** Theme (project) ids; '' is "No theme". */
+  themeIds?:      string[]
+  /** Pillar ids; '' is "No pillar". */
+  pillarIds?:     string[]
+  /** Choice and multi-choice fields (Channels and custom ones): field id → option ids. */
+  fieldOptions?:  Record<string, string[]>
 }
 
 export const EMPTY_FILTERS: BoardFilterState = {
@@ -72,7 +84,9 @@ export function activeFilterCount(f: BoardFilterState): number {
     (f.duePreset !== 'any' || f.dueFrom || f.dueTo ? 1 : 0) +
     ((f.publishPreset ?? 'any') !== 'any' || f.publishFrom || f.publishTo ? 1 : 0) +
     (f.onlyMine        ? 1 : 0) +
-    (f.withAttachments ? 1 : 0)
+    (f.withAttachments ? 1 : 0) +
+    (f.creatorIds?.length ? 1 : 0) + (f.tagIds?.length ? 1 : 0) + (f.themeIds?.length ? 1 : 0) + (f.pillarIds?.length ? 1 : 0) +
+    Object.values(f.fieldOptions ?? {}).filter(v => v.length).length
   )
 }
 
@@ -88,9 +102,11 @@ const LIST_PARAMS = {
   brandIds: 'brand', ownerIds: 'assignee', contentTypes: 'type',
   platforms: 'platform', priorities: 'priority', alerts: 'sla',
 } as const
+/** QA 26 Nov 2026 (QF-13): the new filters' query keys. A field's options are "field:option". */
+const MORE_PARAMS = { creatorIds: 'owner', tagIds: 'tag', themeIds: 'theme', pillarIds: 'pillar' } as const
 
 /** Every query key the filters own, and nothing else. */
-const FILTER_PARAMS = ['q', ...Object.values(LIST_PARAMS), 'due', 'from', 'to', 'mine', 'files']
+const FILTER_PARAMS = ['q', ...Object.values(LIST_PARAMS), ...Object.values(MORE_PARAMS), 'fld', 'due', 'from', 'to', 'mine', 'files']
 
 type ParamSource = Pick<URLSearchParams, 'get' | 'getAll'>
 
@@ -112,6 +128,11 @@ export function filtersFromParams(p: ParamSource): BoardFilterState {
     dueTo:           day('to'),
     onlyMine:        p.get('mine') === '1',
     withAttachments: p.get('files') === '1',
+    creatorIds:      list(MORE_PARAMS.creatorIds),
+    tagIds:          list(MORE_PARAMS.tagIds),
+    themeIds:        p.getAll(MORE_PARAMS.themeIds),
+    pillarIds:       p.getAll(MORE_PARAMS.pillarIds),
+    fieldOptions:    p.getAll('fld').reduce<Record<string, string[]>>((o, v) => { const [f, opt] = v.split(':'); if (f && opt) (o[f] ??= []).push(opt); return o }, {}),
   }
 }
 
@@ -127,6 +148,8 @@ export function writeFiltersToUrl(url: URL, f: BoardFilterState): boolean {
   if (f.dueTo) want.set('to', f.dueTo)
   if (f.onlyMine) want.set('mine', '1')
   if (f.withAttachments) want.set('files', '1')
+  for (const [field, key] of Object.entries(MORE_PARAMS) as [keyof typeof MORE_PARAMS, string][]) (f[field] ?? []).forEach(v => want.append(key, v))
+  for (const [fid, opts] of Object.entries(f.fieldOptions ?? {})) opts.forEach(o => want.append('fld', `${fid}:${o}`))
 
   const sp = url.searchParams
   const same = FILTER_PARAMS.every(k => sp.getAll(k).join('\u0000') === want.getAll(k).join('\u0000'))
@@ -139,7 +162,7 @@ export function writeFiltersToUrl(url: URL, f: BoardFilterState): boolean {
 export function applyBoardFilters<T extends Task>(
   tasks: T[],
   f: BoardFilterState,
-  ctx: { currentUserId: string; slaConfig: SLAConfig; today: Date },
+  ctx: { currentUserId: string; slaConfig: SLAConfig; today: Date; valueOf?: (taskId: string, fieldId: string) => unknown },
 ): T[] {
   const q = f.search.trim().toLowerCase()
 
@@ -151,8 +174,21 @@ export function applyBoardFilters<T extends Task>(
     if (f.onlyMine && (t.assignee_id ?? t.task_owner_id) !== ctx.currentUserId) return false
     if (f.brandIds.length     && !f.brandIds.includes(t.brand_id)) return false
     // The Assignee filter means who is doing it, which is what people mean
-    // when they ask whose task it is.
-    if (f.ownerIds.length     && !f.ownerIds.includes(t.assignee_id ?? t.task_owner_id)) return false
+    // when they ask whose task it is. QA 26 Nov 2026 (QF-13): any of its assignees.
+    if (f.ownerIds.length) {
+      const doers = [...new Set([...(t.assignee_ids ?? []), ...(t.assignee_id ? [t.assignee_id] : [])])]
+      if (!(doers.length ? doers : [t.task_owner_id]).some(id => f.ownerIds.includes(id))) return false
+    }
+    if (f.creatorIds?.length && !f.creatorIds.includes(t.task_owner_id)) return false
+    if (f.tagIds?.length && !(t.tag_ids ?? []).some(id => f.tagIds!.includes(id))) return false
+    if (f.themeIds?.length && !f.themeIds.includes(t.project_id ?? '')) return false
+    if (f.pillarIds?.length && !f.pillarIds.includes(t.pillar_id ?? '')) return false
+    for (const [fid, opts] of Object.entries(f.fieldOptions ?? {})) {
+      if (!opts.length) continue
+      const v = ctx.valueOf?.(t.id, fid)
+      const have = Array.isArray(v) ? v as string[] : typeof v === 'string' ? [v] : []
+      if (!have.some(x => opts.includes(x))) return false
+    }
     // Spec 021 (US4): a value switched off for the task's brand is hidden, so it matches nothing.
     if (f.contentTypes.length && !(featureOn(t.brand, 'type') && f.contentTypes.includes(t.content_type_label))) return false
     if (f.platforms.length    && !(featureOn(t.brand, 'platform') && f.platforms.includes(t.platform ?? ''))) return false
@@ -200,6 +236,8 @@ export function applyBoardFilters<T extends Task>(
 // ─── UI ──────────────────────────────────────────────────────────────────────
 
 interface FiltersButtonProps {
+  /** QA 26 Nov 2026 (QF-13): themes and their pillars, for the Theme and Pillar filters. */
+  themes?: { id: string; name: string; pillars: { id: string; name: string }[] }[]
   filters:  BoardFilterState
   onChange: (next: BoardFilterState) => void
   tasks:    Task[]          // unfiltered — the source of the option lists
@@ -236,8 +274,12 @@ function FilterIcon() {
  * header's toolbar. Brands and search have their own controls, so they do
  * not count towards the number on the button.
  */
-export function FiltersButton({ filters, onChange, tasks, members }: FiltersButtonProps) {
+export function FiltersButton({ filters, onChange, tasks, members, themes = [] }: FiltersButtonProps) {
   const t = useTranslations('header')
+  const tf = useTranslations('filters')
+  const tPri = useTranslations('priority')
+  const typeLook = useTypeLook()
+  const card = useCardFields()
   const locale = useLocale()
   const set = <K extends keyof BoardFilterState>(key: K, value: BoardFilterState[K]) =>
     onChange({ ...filters, [key]: value })
@@ -266,15 +308,31 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
   const anyPriority = useMemo(() => featureOnAny(tasks.map(t => t.brand), 'priorities'), [tasks])
   const anySla = useMemo(() => featureOnAny(tasks.map(t => t.brand), 'sla'), [tasks])
   const usedOwnerIds = useMemo(() => new Set(tasks.map(t => t.assignee_id ?? t.task_owner_id)), [tasks])
+  // QA 26 Nov 2026 (QF-13): only values that exist on the page are offered.
+  const flip = (cur: string[] | undefined, v: string) => (cur ?? []).includes(v) ? (cur ?? []).filter(x => x !== v) : [...(cur ?? []), v]
+  const usedCreators = useMemo(() => [...new Set(tasks.map(t => t.task_owner_id).filter(Boolean))].sort((a, b) => memberNameOf(a).localeCompare(memberNameOf(b))), [tasks]) // eslint-disable-line react-hooks/exhaustive-deps
+  function memberNameOf(id: string) { return members.find(m => m.id === id)?.name ?? '' }
+  const usedThemes = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const t of tasks) m.set(t.project_id ?? '', t.project?.name ?? tf('noTheme'))
+    return [...m.entries()].sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || a[1].localeCompare(b[1]))
+  }, [tasks]) // eslint-disable-line react-hooks/exhaustive-deps
+  const usedPillars = useMemo(() => {
+    const names = new Map(themes.flatMap(th => th.pillars.map(p => [p.id, p.name] as const)))
+    const ids = [...new Set(tasks.filter(t => t.project_id).map(t => t.pillar_id ?? ''))]
+    return ids.length > 1 || (ids.length === 1 && ids[0]) ? ids.map(id => [id, id ? names.get(id) ?? '…' : tf('noPillar')] as [string, string]).sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || a[1].localeCompare(b[1])) : []
+  }, [tasks, themes]) // eslint-disable-line react-hooks/exhaustive-deps
+  const usedTags = useMemo(() => { const ids = new Set(tasks.flatMap(t => t.tag_ids ?? [])); return (card?.tags ?? []).filter(tg => ids.has(tg.id)) }, [tasks, card?.tags])
+  const choiceFields = useMemo(() => (card?.fields ?? []).filter(fd => (fd.kind === 'choice' || fd.kind === 'multi') && !fd.retired && tasks.some(t => card?.values.get(t.id)?.has(fd.id))), [card?.fields, card?.values, tasks])
 
-  const memberName = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
+  const memberName = (id: string) => members.find(m => m.id === id)?.name ?? tf('unknown')
 
   const count = activeFilterCount(filters)
   const behindButton = count - (filters.search.trim() ? 1 : 0)
 
   const pp = filters.publishPreset ?? 'any'
   const publishText = pp !== 'any'
-    ? ({ today: 'Publishing today', week: 'Next 7 days', none: 'No publishing date' } as const)[pp]
+    ? ({ today: tf('publishToday'), week: tf('next7'), none: tf('noPublish') })[pp]
     : filters.publishFrom || filters.publishTo ? `${filters.publishFrom || '…'} → ${filters.publishTo || '…'}` : ''
   // The range reads as dates, in the reader's language, not as ISO strings.
   // The values are calendar days, so they are formatted at UTC midnight to
@@ -282,7 +340,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
   const dayFmt = new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
   const showDay = (d: string) => (d ? dayFmt.format(new Date(`${d}T00:00:00Z`)) : '…')
   const dueText = filters.duePreset !== 'any'
-    ? ({ overdue: 'Overdue', today: 'Due today', week: 'Next 7 days', none: 'No due date' } as const)[filters.duePreset]
+    ? ({ overdue: tf('overdue'), today: tf('dueToday'), week: tf('next7'), none: tf('noDue') })[filters.duePreset]
     : filters.dueFrom || filters.dueTo
       ? `${showDay(filters.dueFrom)} → ${showDay(filters.dueTo)}`
       : null
@@ -296,18 +354,18 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
       trigger={<><FilterIcon /><span className="fx-hd-lbl-keep">{behindButton > 0 ? t('filtersN', { n: behindButton }) : t('filters')}</span></>}
     >
       <div className="fx-hd-filters">
-        <PillSection label="Search">
+        <PillSection label={tf('search')}>
           <PillInput
             name="q"
-            aria-label="Search tasks"
+            aria-label={tf('searchTasks')}
             autoComplete="off"
             value={filters.search}
-            placeholder="Name, owner, project…"
+            placeholder={tf('searchPlaceholder')}
             onChange={e => set('search', e.target.value)}
           />
         </PillSection>
 
-        <PillSection label="Assignee">
+        <PillSection label={tf('assignee')}>
           {members.filter(m => usedOwnerIds.has(m.id)).map(m => (
             <PillOption key={m.id} selected={filters.ownerIds.includes(m.id)} pressed={filters.ownerIds.includes(m.id)}
                         onClick={() => toggle('ownerIds', m.id)}>
@@ -316,7 +374,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           ))}
         </PillSection>
 
-        {usedBrands.length > 1 && <PillSection label="Brand">
+        {usedBrands.length > 1 && <PillSection label={tf('brand')}>
           {usedBrands.map(([id, name]) => (
             <PillOption key={id} selected={filters.brandIds.includes(id)} pressed={filters.brandIds.includes(id)}
                         onClick={() => toggle('brandIds', id)} data-filter-brand={id}>
@@ -325,11 +383,58 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           ))}
         </PillSection>}
 
-        {usedTypes.length > 0 && <PillSection label="Content type">
+        {/* QA 26 Nov 2026 (QF-13): Owner, Theme, Pillar, Tags and each choice field (Channels…) can filter too. */}
+        {usedCreators.length > 0 && <PillSection label={tf('owner')}>
+          {usedCreators.map(id => (
+            <PillOption key={id} selected={!!filters.creatorIds?.includes(id)} pressed={!!filters.creatorIds?.includes(id)} data-filter-owner={id}
+                        onClick={() => onChange({ ...filters, creatorIds: flip(filters.creatorIds, id) })}>
+              <Check on={!!filters.creatorIds?.includes(id)} /> {memberName(id)}
+            </PillOption>
+          ))}
+        </PillSection>}
+        {usedThemes.length > 0 && <PillSection label={tf('theme')}>
+          {usedThemes.map(([id, name]) => (
+            <PillOption key={id || 'none'} selected={!!filters.themeIds?.includes(id)} pressed={!!filters.themeIds?.includes(id)} data-filter-theme={id}
+                        onClick={() => onChange({ ...filters, themeIds: flip(filters.themeIds, id) })}>
+              <Check on={!!filters.themeIds?.includes(id)} /> {name}
+            </PillOption>
+          ))}
+        </PillSection>}
+        {usedPillars.length > 0 && <PillSection label={tf('pillar')}>
+          {usedPillars.map(([id, name]) => (
+            <PillOption key={id || 'none'} selected={!!filters.pillarIds?.includes(id)} pressed={!!filters.pillarIds?.includes(id)} data-filter-pillar={id}
+                        onClick={() => onChange({ ...filters, pillarIds: flip(filters.pillarIds, id) })}>
+              <Check on={!!filters.pillarIds?.includes(id)} /> {name}
+            </PillOption>
+          ))}
+        </PillSection>}
+        {choiceFields.map(fd => (
+          <PillSection key={fd.id} label={locale.startsWith('ar') && fd.name_ar ? fd.name_ar : fd.name_en}>
+            {(fd.options.choices ?? []).map(c => {
+              const on = !!filters.fieldOptions?.[fd.id]?.includes(c.id)
+              return (
+                <PillOption key={c.id} selected={on} pressed={on} data-filter-field={`${fd.id}:${c.id}`}
+                            onClick={() => onChange({ ...filters, fieldOptions: { ...(filters.fieldOptions ?? {}), [fd.id]: flip(filters.fieldOptions?.[fd.id], c.id) } })}>
+                  <Check on={on} /> <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: c.color ?? '#6B7280', display: 'inline-block' }} /> {locale.startsWith('ar') && c.ar ? c.ar : c.en}
+                </PillOption>
+              )
+            })}
+          </PillSection>
+        ))}
+        {usedTags.length > 0 && <PillSection label={tf('tags')}>
+          {usedTags.map(tg => (
+            <PillOption key={tg.id} selected={!!filters.tagIds?.includes(tg.id)} pressed={!!filters.tagIds?.includes(tg.id)} data-filter-tag={tg.id}
+                        onClick={() => onChange({ ...filters, tagIds: flip(filters.tagIds, tg.id) })}>
+              <Check on={!!filters.tagIds?.includes(tg.id)} /> {tg.name}
+            </PillOption>
+          ))}
+        </PillSection>}
+
+        {usedTypes.length > 0 && <PillSection label={tf('type')}>
           {usedTypes.map(v => (
             <PillOption key={v} selected={filters.contentTypes.includes(v)} pressed={filters.contentTypes.includes(v)}
                         onClick={() => toggle('contentTypes', v)}>
-              <Check on={filters.contentTypes.includes(v)} /> {v}
+              <Check on={filters.contentTypes.includes(v)} /> <TypeIcon icon={typeLook(v).icon} color={typeLook(v).color} size={11} /> {typeLook(v).name}
             </PillOption>
           ))}
         </PillSection>}
@@ -346,28 +451,28 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           </PillSection>
         )}
 
-        {anyPriority && <PillSection label="Priority">
+        {anyPriority && <PillSection label={tf('priority')}>
           {PRIORITY_OPTIONS.map(v => (
             <PillOption key={v} selected={filters.priorities.includes(v)} pressed={filters.priorities.includes(v)}
                         onClick={() => toggle('priorities', v)}>
-              <Check on={filters.priorities.includes(v)} /> {v}
+              <Check on={filters.priorities.includes(v)} /> {tPri.has(v) ? tPri(v) : v}
             </PillOption>
           ))}
         </PillSection>}
 
-        {anySla && <PillSection label="SLA status">
+        {anySla && <PillSection label={tf('sla')}>
           {ALERT_OPTIONS.map(v => (
             <PillOption key={v} selected={filters.alerts.includes(v)} pressed={filters.alerts.includes(v)}
                         onClick={() => toggleAlert(v)}>
-              <Check on={filters.alerts.includes(v)} /> {v}
+              <Check on={filters.alerts.includes(v)} /> {tf(`alert.${v.replace(/ /g, '')}`)}
             </PillOption>
           ))}
         </PillSection>}
 
-        <PillSection label={`Due date${dueText ? ` · ${dueText}` : ''}`}>
+        <PillSection label={`${tf('due')}${dueText ? ` · ${dueText}` : ''}`}>
           {([
-            ['any', 'Any date'], ['overdue', 'Overdue'], ['today', 'Due today'],
-            ['week', 'Next 7 days'], ['none', 'No due date'],
+            ['any', tf('anyDate')], ['overdue', tf('overdue')], ['today', tf('dueToday')],
+            ['week', tf('next7')], ['none', tf('noDue')],
           ] as [DuePreset, string][]).map(([v, label]) => (
             <PillOption key={v} selected={filters.duePreset === v} pressed={filters.duePreset === v}
                         onClick={() => set('duePreset', v)}>
@@ -375,16 +480,16 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
             </PillOption>
           ))}
           <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
-            <PillInput type="date" name="from" aria-label="Due from" value={filters.dueFrom}
+            <PillInput type="date" name="from" aria-label={tf('dueFrom')} value={filters.dueFrom}
                        onChange={e => set('dueFrom', e.target.value)} />
-            <PillInput type="date" name="to" aria-label="Due to" value={filters.dueTo}
+            <PillInput type="date" name="to" aria-label={tf('dueTo')} value={filters.dueTo}
                        onChange={e => set('dueTo', e.target.value)} />
           </div>
         </PillSection>
 
-        <PillSection label={`Publishing date${publishText ? ` · ${publishText}` : ''}`}>
+        <PillSection label={`${tf('publish')}${publishText ? ` · ${publishText}` : ''}`}>
           {([
-            ['any', 'Any date'], ['today', 'Publishing today'], ['week', 'Next 7 days'], ['none', 'No publishing date'],
+            ['any', tf('anyDate')], ['today', tf('publishToday')], ['week', tf('next7')], ['none', tf('noPublish')],
           ] as [PublishPreset, string][]).map(([v, label]) => (
             <PillOption key={v} selected={(filters.publishPreset ?? 'any') === v}
                         onClick={() => onChange({ ...filters, publishPreset: v })}>
@@ -399,10 +504,10 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           </div>
         </PillSection>
 
-        <PillSection label="Only">
+        <PillSection label={tf('only')}>
           {/* QA 26 Nov 2026 (F12): "My tasks" is the avatar Mine button now. */}
           <PillOption selected={filters.withAttachments} pressed={filters.withAttachments} onClick={() => set('withAttachments', !filters.withAttachments)}>
-            <Check on={filters.withAttachments} /> Has files
+            <Check on={filters.withAttachments} /> {tf('hasFiles')}
           </PillOption>
         </PillSection>
 

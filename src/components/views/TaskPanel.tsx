@@ -45,6 +45,7 @@ export function TaskPanel({ data, spaceId = null }: { data: BoardData; /** Spec 
       brands={data.brands}
       members={data.members}
       contentTypes={data.contentTypes}
+      themes={data.themes}
       allTasks={tasks.map(t => ({ id: t.id, name: t.name, status: t.status }))}
       hasStorage={data.hasStorage}
       spaces={data.spaces}

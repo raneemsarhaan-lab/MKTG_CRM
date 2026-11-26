@@ -180,11 +180,12 @@ export function FieldPill({ label, value, icon, active, variant = 'field', iconO
  * whose own tint already says more.
  */
 export function PillOption({
-  selected, pressed, onClick, children,
-}: { selected: boolean; pressed?: boolean; onClick: () => void; children: React.ReactNode }) {
+  selected, pressed, onClick, children, ...data
+}: { selected: boolean; pressed?: boolean; onClick: () => void; children: React.ReactNode } & { [k: `data-${string}`]: string | undefined }) {
   return (
     <button
       type="button"
+      {...data}
       onClick={onClick}
       aria-pressed={pressed}
       className={selected ? undefined : 'fx-hov-tint'}
