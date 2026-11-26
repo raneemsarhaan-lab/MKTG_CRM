@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { SESSION_COOKIE, signSession, cookieOptions } from '@/lib/session'
+import { failed, succeeded, waitMinutes } from '@/lib/login-limit'
 
 /**
  * Sign in. One request in, one cookie out.
@@ -33,7 +34,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Enter your email and password.' }, { status: 400 })
   }
 
-  console.log(`[fluxo:auth] attempt for ${email} · password ${password.length} chars`)
+  // QA 26 Nov 2026 (F10): too many wrong tries → wait. Addresses aren't written to the log.
+  const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || req.headers.get('x-real-ip') || 'local'
+  const wait = waitMinutes(email, ip)
+  if (wait) {
+    console.log(`[fluxo:auth] too many wrong tries — sign-in paused for ${wait} min`)
+    return NextResponse.json({ ok: false, error: `Too many tries. Try again in ${wait} minute${wait === 1 ? '' : 's'}, or reset your password.`, wait }, { status: 429 })
+  }
 
   let member
   try {
@@ -49,7 +56,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (!member) {
-    console.log(`[fluxo:auth] no account with the address ${email}`)
+    console.log('[fluxo:auth] no account with that address')
+    failed(email, ip)
     return NextResponse.json({ ok: false, error: 'Invalid email or password.' }, { status: 401 })
   }
   if (!member.password_hash) {
@@ -61,6 +69,7 @@ export async function POST(req: NextRequest) {
   }
   if (!(await bcrypt.compare(password, member.password_hash))) {
     console.log(`[fluxo:auth] wrong password for ${member.name}`)
+    failed(email, ip)
     return NextResponse.json({ ok: false, error: 'Invalid email or password.' }, { status: 401 })
   }
 
@@ -70,6 +79,7 @@ export async function POST(req: NextRequest) {
     req.headers.get('x-forwarded-proto') === 'https' ||
     req.nextUrl.protocol === 'https:'
 
+  succeeded(email, ip)
   const res = NextResponse.json({ ok: true, name: member.name })
   res.cookies.set(SESSION_COOKIE, await signSession(member), cookieOptions(isHttps))
   res.headers.set('Cache-Control', 'no-store')
