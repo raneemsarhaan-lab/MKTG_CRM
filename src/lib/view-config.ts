@@ -22,7 +22,9 @@ export type ViewSort = 'due' | 'publish' | 'name' | 'priority' | 'stage' | Field
 export const HAS_VALUE = '__set'
 export const VIEW_FILTERS: ViewFilterKey[] = ['brand', 'assignee', 'type', 'campaign', 'statusGroup', 'tag']
 export const VIEW_SORTS: ViewSort[] = ['due', 'publish', 'name', 'priority', 'stage']
-export const VIEW_FIELDS = ['brand', 'status', 'assignee', 'publish', 'start', 'due', 'type', 'priority', 'tags'] as const // QF-07: no Platform
+export const VIEW_FIELDS = ['brand', 'status', 'assignee', 'owner', 'publish', 'start', 'due', 'type', 'priority', 'tags', 'theme', 'pillar'] as const // QF-07: no Platform
+/** Owner, 26 Nov 2026: every field is listed; these start turned off, so nobody's cards change until they choose. */
+export const VIEW_FIELDS_OFF: readonly string[] = ['owner', 'start', 'theme', 'pillar']
 
 /** Spec 023: a custom field shows as `f:<field id>` beside the standard fields. */
 export const CUSTOM_FIELD = /^f:[0-9a-f-]{36}$/i
@@ -44,7 +46,7 @@ export function shownFields(
   const live = new Set(custom.filter(f => !f.retired).map(f => `f:${f.id}`))
   if (saved) return saved.filter(k => !CUSTOM_FIELD.test(k) || live.has(k))
   const onPage = custom.filter(f => !f.retired && links.some(l => l.field_id === f.id && typesOnPage.has(l.type_label)) && (view !== 'board' || f.on_card))
-  return [...VIEW_FIELDS, ...onPage.map(f => `f:${f.id}`)]
+  return [...VIEW_FIELDS.filter(k => !VIEW_FIELDS_OFF.includes(k)), ...onPage.map(f => `f:${f.id}`)]
 }
 
 export interface ViewConfig {

@@ -124,6 +124,8 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   // The latest choices, for a save that follows another in the same click (hide a tab, then leave it).
   const prefsRef = useRef(prefs)
   prefsRef.current = prefs
+  // Owner, 26 Nov 2026: choices made while the saved ones load (a field ticked) aren't overwritten by them.
+  const prefsEdits = useRef(0)
   const [tabMenu, setTabMenu] = useState<{ key: string; x: number; y: number } | null>(null)
   const [hiddenMenu, setHiddenMenu] = useState<{ x: number; y: number } | null>(null)
   const firstLoad = useRef(true)
@@ -143,10 +145,11 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
 
   async function reload(select?: string) {
     if (!node) return
+    const edits = prefsEdits.current
     const r = await listViews(node).catch(() => null)
     if (!r?.success) return
     setViews(r.views)
-    setPrefs(r.prefs)
+    if (prefsEdits.current === edits) setPrefs(r.prefs)
     // Without a ?view= in the address, the page opens on this member's home view.
     if (firstLoad.current) {
       firstLoad.current = false
@@ -197,6 +200,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   const allTabs: (ViewTab & { personal?: boolean })[] = [...tabs, ...views.map(v => ({ key: savedKey(v), label: v.name, personal: !!v.owner_id }))]
   const arranged = node ? arrangeTabs(allTabs, prefs) : { shown: allTabs, hidden: [] as typeof allTabs }
   function updatePrefs(next: TabPrefs) {
+    prefsEdits.current++
     prefsRef.current = next
     setPrefs(next)
     setTabMenu(null)
@@ -224,7 +228,9 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
     : undefined
   function setShown(keys: string[]) {
     if (open && config) { setDrafts(d => ({ ...d, [open.id]: { ...config, fields: keys } })); return }
-    const next = { ...prefs, fields: { ...(prefs.fields ?? {}), [tab]: keys } }
+    const next = { ...prefsRef.current, fields: { ...(prefsRef.current.fields ?? {}), [tab]: keys } }
+    prefsEdits.current++
+    prefsRef.current = next
     setPrefs(next)
     if (node) void setTabPrefs(node, next).catch(() => null)
   }

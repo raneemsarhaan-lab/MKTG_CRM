@@ -28,8 +28,11 @@ export interface EditableTask {
   due_date?: string | null
   start_date?: string | null
   tag_ids?: string[]
+  task_owner_id?: string | null
+  project_id?: string | null
+  pillar_id?: string | null
 }
-export type CardEditKey = 'brand' | 'type' | 'priority' | 'assignee' | 'publish' | 'due' | 'start' | 'tags' | `f:${string}`
+export type CardEditKey = 'brand' | 'type' | 'priority' | 'assignee' | 'owner' | 'theme' | 'pillar' | 'publish' | 'due' | 'start' | 'tags' | `f:${string}`
 
 interface Open { task: EditableTask; key: CardEditKey; anchor: HTMLElement }
 const Ctx = createContext<{ open(task: EditableTask, key: CardEditKey, anchor: HTMLElement): void } | null>(null)
@@ -75,6 +78,20 @@ export function CardEditProvider({ brands = [], children }: { brands?: Pick<Bran
       ...(ctx?.members ?? []).map(m => ({ key: m.id, text: m.name, label: m.name, tone: tone(m.id === task.assignee_id), onSelect: () => save({ assignee_id: m.id }) })),
       { key: '', text: t('unassigned'), label: t('unassigned'), tone: tone(!task.assignee_id), onSelect: () => save({ assignee_id: null }) },
     ])
+    else if (key === 'owner') layer = menu(t('owner'), (ctx?.members ?? []).map(m => ({ key: m.id, text: m.name, label: m.name, tone: tone(m.id === task.task_owner_id), onSelect: () => save({ task_owner_id: m.id }) })))
+    else if (key === 'theme') layer = menu(t('theme'), [
+      ...[...new Map((ctx?.themes ?? []).map(th => [th.id, th])).values()].map(th => ({ key: th.id, text: th.name, label: th.name, tone: tone(th.id === task.project_id), onSelect: () => save({ project_id: th.id, pillar_id: null }) })),
+      { key: '', text: t('noTheme'), label: t('noTheme'), tone: tone(!task.project_id), onSelect: () => save({ project_id: null, pillar_id: null }) },
+    ])
+    else if (key === 'pillar') {
+      const th = ctx?.themes.find(x => x.id === task.project_id)
+      layer = th
+        ? menu(t('pillar'), [
+            ...th.pillars.map(p => ({ key: p.id, text: p.name, label: p.name, tone: tone(p.id === task.pillar_id), onSelect: () => save({ pillar_id: p.id }) })),
+            { key: '', text: t('noPillar'), label: t('noPillar'), tone: tone(!task.pillar_id), onSelect: () => save({ pillar_id: null }) },
+          ])
+        : <SheetPopover anchor={anchor} label={t('pillar')} onClose={close}><p style={{ margin: 0, padding: 10, fontSize: 12.5 }}>{t('themeFirst')}</p></SheetPopover>
+    }
     else if (key === 'tags') {
       const have = task.tag_ids ?? []
       layer = menu(t('tags'), (ctx?.tags ?? []).map(tg => ({ key: tg.id, text: tg.name, label: <span>{have.includes(tg.id) ? '☑' : '☐'} {tg.name}</span>,

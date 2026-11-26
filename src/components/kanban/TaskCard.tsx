@@ -1,5 +1,6 @@
 'use client'
 
+import { CardEditTarget } from '@/components/fields/CardEditor'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useDndContext } from '@dnd-kit/core'
 import { useSortable } from '@dnd-kit/sortable'
@@ -9,6 +10,7 @@ import { getAlertStatus } from '@/lib/alert-status'
 import { featureOn } from '@/lib/brand-features'
 import { useTaskLinkNames } from './TaskLinks'
 import { CardMedia } from '@/components/media/MediaLinks'
+import { priorityColor } from '@/lib/priorities'
 import { TaskDates } from '@/components/shared/DueDates'
 import { cairoToday, daysBetween, isOverdue } from '@/lib/due-dates'
 import { useLocale, useTranslations } from 'next-intl'
@@ -178,7 +180,11 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   const type = types?.find(x => x.label === task.content_type_label)
   const ctx = useCardFields()
   const tPri = useTranslations('priority')
+  const tEdit = useTranslations('cardEdit')
+  const tPanel = useTranslations('panel')
   const tRepeat = useTranslations('repeat')
+  const theme = ctx?.themes.find(th => th.id === task.project_id)
+  const pillar = theme?.pillars.find(p => p.id === task.pillar_id)
   const tagList = (task.tag_ids ?? []).map(id => ctx?.tags.find(x => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
   const people = (task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])).map(id => ctx?.members.find(m => m.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
   // A video file on the task (newest first): the card shows its frame, a play button and its length.
@@ -200,7 +206,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
       )}
 
       {/* The brand on one small line, with its icon. */}
-      {shows('brand') && <div data-card-brand="" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {shows('brand') && <CardEditTarget task={task} field="brand" label={tEdit('change', { field: tPanel('brand') })}><div data-card-brand="" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span aria-hidden="true" style={{
           width: 16, height: 16, borderRadius: 4, flexShrink: 0, overflow: 'hidden',
           background: task.brand ? brandColor : PIPE.surface,
@@ -222,7 +228,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         }}>
           {task.brand?.name ?? 'No brand'}
         </span>
-      </div>}
+      </div></CardEditTarget>}
 
       {/* Title, in medium weight. */}
       <div data-card-title="" style={{
@@ -247,23 +253,42 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
           </span>
         ))}
         {/* Spec 023 (US4): up to three tags, then +N. */}
-        {featureOn(task.brand, 'tags') && tagList.slice(0, 3).map(tg => <TagChip key={tg.id} tag={tg} small />)}
-        {featureOn(task.brand, 'tags') && tagList.length > 3 && <span style={{ fontSize: 10.5, fontWeight: 700, color: PIPE.textFaint, alignSelf: 'center' }}>+{tagList.length - 3}</span>}
+        {featureOn(task.brand, 'tags') && shows('tags') && tagList.length > 0 && <CardEditTarget task={task} field="tags" label={tEdit('change', { field: tEdit('tags') })}><span style={{ display: 'inline-flex', gap: 4 }}>{tagList.slice(0, 3).map(tg => <TagChip key={tg.id} tag={tg} small />)}</span></CardEditTarget>}
+        {featureOn(task.brand, 'tags') && shows('tags') && tagList.length > 3 && <span style={{ fontSize: 10.5, fontWeight: 700, color: PIPE.textFaint, alignSelf: 'center' }}>+{tagList.length - 3}</span>}
         {/* Spec 023 (US8): a repeating task. */}
         {task.repeat_rule_id && (
           <span data-repeat-mark="" title={tRepeat('mark')} aria-label={tRepeat('mark')} style={{ display: 'inline-flex', alignItems: 'center', fontSize: 12, fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: PIPE.surface, color: PIPE.textSecondary }}>↻</span>
         )}
         {task.priority === 'Urgent' && featureOn(task.brand, 'priorities') && (
-          <span data-card-urgent="" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 800, padding: '4px 8px', borderRadius: 6, background: '#FDE7EA', color: '#D22040', whiteSpace: 'nowrap' }}>⚑ {tPri('Urgent')}</span>
+          <CardEditTarget task={task} field="priority" label={tEdit('change', { field: tPanel('priority') })}><span data-card-urgent="" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 800, padding: '4px 8px', borderRadius: 6, background: '#FDE7EA', color: '#D22040', whiteSpace: 'nowrap' }}>⚑ {tPri('Urgent')}</span></CardEditTarget>
+        )}
+        {/* Owner, 26 Nov 2026: with Priority ticked, High and Low show too (Normal stays quiet). */}
+        {shows('priority') && featureOn(task.brand, 'priorities') && (task.priority === 'High' || task.priority === 'Low') && (
+          <CardEditTarget task={task} field="priority" label={tEdit('change', { field: tPanel('priority') })}><span data-card-priority={task.priority} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: PIPE.surface, color: priorityColor(task.priority), whiteSpace: 'nowrap' }}>⚑ {tPri(task.priority)}</span></CardEditTarget>
         )}
         {task.content_type_label && featureOn(task.brand, 'type') && shows('type') && (
-          <span data-card-type={task.content_type_label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap',
+          <CardEditTarget task={task} field="type" label={tEdit('change', { field: tPanel('type') })}><span data-card-type={task.content_type_label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap',
             background: type?.color ? `${type.color}1A` : PIPE.surface, color: type?.color ?? PIPE.textMuted }}>
             <TypeIcon icon={type?.icon} color={type?.color ?? PIPE.textMuted} size={11} />
             {type ? typeName(type, locale) : task.content_type_label}
-          </span>
+          </span></CardEditTarget>
         )}
       </div>
+
+      {/* Owner, 26 Nov 2026: Owner, Start date and Theme › Pillar, each when ticked in Fields; a click edits it. */}
+      {(shows('owner') || shows('start') || shows('theme') || shows('pillar')) && (
+        <div data-card-extra="" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', marginTop: 8, fontSize: 11, color: PIPE.textMuted }}>
+          {shows('owner') && <CardEditTarget task={task} field="owner" label={tEdit('change', { field: tEdit('owner') })}><span data-card-owner="">{tEdit('ownerLine', { name: task.task_owner?.name ?? tEdit('empty') })}</span></CardEditTarget>}
+          {shows('start') && <CardEditTarget task={task} field="start" label={tEdit('change', { field: tEdit('start') })}><span data-card-start="" dir="auto">{tEdit('startLine', { date: task.start_date ? task.start_date.slice(0, 10) : tEdit('empty') })}</span></CardEditTarget>}
+          {(shows('theme') || shows('pillar')) && (
+            <span data-card-theme="" style={{ display: 'inline-flex', gap: 4 }}>
+              {shows('theme') && <CardEditTarget task={task} field="theme" label={tEdit('change', { field: tEdit('theme') })}><span>{theme?.name ?? tEdit('noTheme')}</span></CardEditTarget>}
+              {shows('theme') && shows('pillar') && <span aria-hidden="true">›</span>}
+              {shows('pillar') && <CardEditTarget task={task} field="pillar" label={tEdit('change', { field: tEdit('pillar') })}><span data-card-pillar="">{pillar?.name ?? tEdit('noPillar')}</span></CardEditTarget>}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* One meta row: attachments, comments and dates (the due date red when overdue), the assignee on the right. */}
       <div data-card-meta="" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 9, gap: 8 }}>
@@ -289,9 +314,13 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
             </span>
           )}
           {/* Publishing and due dates, each labelled (✎ on a due date set by hand; red when overdue). */}
-          {(shows('publish') || shows('due')) && <TaskDates task={shows('publish') && shows('due') ? task : { ...task, publish_date: shows('publish') ? task.publish_date : null, due_date: shows('due') ? task.due_date : null } as typeof task} size={11} />}
+          {/* Owner, 26 Nov 2026: each date opens its own editor. */}
+          {shows('publish') && task.publish_date && <CardEditTarget task={task} field="publish" label={tEdit('change', { field: tEdit('publish') })}><TaskDates task={{ ...task, due_date: null } as typeof task} size={11} /></CardEditTarget>}
+          {shows('due') && <CardEditTarget task={task} field="due" label={tEdit('change', { field: tPanel('dueDate') })}>{task.due_date
+            ? <TaskDates task={{ ...task, publish_date: null } as typeof task} size={11} />
+            : <span data-card-due-empty="" style={{ fontSize: 11 }}>{tEdit('dueLine', { date: tEdit('empty') })}</span>}</CardEditTarget>}
         </div>
-        <div style={{ display: 'flex', flexShrink: 0, visibility: shows('assignee') ? undefined : 'hidden' }}>
+        <CardEditTarget task={task} field="assignee" label={tEdit('change', { field: tEdit('assignee') })}><div style={{ display: 'flex', flexShrink: 0, visibility: shows('assignee') ? undefined : 'hidden' }}>
           {/* Spec 023 (US5): up to three assignees, the lead first; otherwise the owner. */}
           {people.length
             ? people.slice(0, 3).map((m, i) => <AssigneeDot key={m.id} name={m.name} stacked={i > 0} />)
@@ -300,7 +329,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
           {!people.length && currentStageOwner && currentStageOwner.id !== task.task_owner.id && (
             <AssigneeDot name={currentStageOwner.name} stacked />
           )}
-        </div>
+        </div></CardEditTarget>
       </div>
 
       {/* A subtask says whose it is — otherwise it is indistinguishable from a

@@ -1,5 +1,6 @@
 'use client'
 
+import { CardEditProvider } from '@/components/fields/CardEditor'
 import { setTaskTags } from '@/actions/tags'
 import { sendOrQueue } from '@/lib/save-queue'
 import { mayCreateIn } from '@/lib/space-settings'
@@ -175,8 +176,10 @@ export function KanbanBoard(props: KanbanBoardProps) {
   const sheetAddLabel = wrapSpace ? newTaskLabel(wrapSpace.settings, wrapLocale, '') || null : null
   return (
     <AddLabelProvider value={sheetAddLabel}>
-    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)} tags={props.tags} spaces={props.spaces} viewSpaceId={props.spaceId ?? null} promoted={props.standardFields}>
-      <KanbanBoardInner {...props} />
+    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)} tags={props.tags} spaces={props.spaces} viewSpaceId={props.spaceId ?? null} promoted={props.standardFields} themes={props.themes}>
+      <CardEditProvider brands={props.brands ?? []}>
+        <KanbanBoardInner {...props} />
+      </CardEditProvider>
     </CardFieldsProvider>
     </AddLabelProvider>
   )

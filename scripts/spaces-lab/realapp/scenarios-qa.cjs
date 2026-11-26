@@ -417,6 +417,8 @@ module.exports = (EMAIL, psql, ok) => {
         const tag = first(`insert into tags (id, name, key, color) values (gen_random_uuid(), 'Lab my tag ${n}', 'lab-my-tag-${n}', '#3E7BEA') returning id`)
         const other = psql(`select name from members where email='${EMAIL.design}'`)
         const row = () => psql(`select coalesce((select name from members where id=task_owner_id),'-')||'|'||coalesce((select name from projects where id=project_id),'-')||'|'||coalesce((select name from content_pillars where id=pillar_id),'-')||'|'||(select count(*) from task_tags where task_id='${t}') from tasks where id='${t}'`)
+        // This check changes the admin's own My tasks columns: put them back afterwards.
+        const layouts = psql(`select coalesce(sheet_layouts,'{}'::jsonb)::text from members where email='${EMAIL.admin}'`)
         try {
           await go('/me?view=sheet')
           await page.waitForSelector('[data-add-field]', { timeout: 60000 })
@@ -434,7 +436,104 @@ module.exports = (EMAIL, psql, ok) => {
           }
           await type('owner', other); await type('theme', `Lab my theme ${n}`); await type('pillar', `Lab my pillar ${n}`); await type('tags', `Lab my tag ${n}`)
           ok(row() === `${other}|Lab my theme ${n}|Lab my pillar ${n}|1`, `owner, theme, pillar and tags saved: ${row()}`)
-        } finally { drop([t]); psql(`delete from tags where id='${tag}'`); psql(`delete from projects where id='${th}'`) }
+        } finally { drop([t]); psql(`delete from tags where id='${tag}'`); psql(`delete from projects where id='${th}'`); psql(`update members set sheet_layouts=$j$${layouts}$j$::jsonb where email='${EMAIL.admin}'`) }
+      },
+    },
+    {
+      // Owner, 26 Nov 2026: Owner, Start, Theme and Pillar are listed in Fields (off by default);
+      // once ticked they show on the board card and each is edited right on the card.
+      id: 'qa-card-edits-every-field', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd(), t = task(`Lab card field ${n}`)
+        psql(`update tasks set priority='High' where id='${t}'`)
+        const th = first(`insert into projects (id, name, standing, is_theme) values (gen_random_uuid(), 'Lab card theme ${n}', true, true) returning id`)
+        psql(`insert into content_themes (id, project_id, space_id, position) values (gen_random_uuid(), '${th}', '${space('content')}', -5)`)
+        psql(`insert into content_pillars (id, project_id, name, sort_order) values (gen_random_uuid(), '${th}', 'Lab card pillar ${n}', 0)`)
+        const other = psql(`select name from members where email='${EMAIL.design}'`)
+        const row = () => psql(`select coalesce((select name from members where id=task_owner_id),'-')||'|'||coalesce(priority,'-')||'|'||coalesce(start_date::date::text,'-')||'|'||coalesce((select name from projects where id=project_id),'-')||'|'||coalesce((select name from content_pillars where id=pillar_id),'-') from tasks where id='${t}'`)
+        const card = `[data-task-card="${t}"]`
+        const keys = ['owner', 'start', 'theme', 'pillar']
+        const setShown = async on => {
+          await page.click('[data-fields-button]')
+          await page.waitForSelector('[data-fields-menu] [data-view-field="owner"]', { timeout: 20000 })
+          for (const k of keys) { if (on) await page.check(`[data-fields-menu] [data-view-field="${k}"]`); else await page.uncheck(`[data-fields-menu] [data-view-field="${k}"]`); await page.waitForTimeout(400) }
+          await page.keyboard.press('Escape'); await page.waitForTimeout(800)
+        }
+        const pick = async (key, text) => {
+          const el = page.locator(`${card} [data-card-edit="${key}"]`).first(); await el.scrollIntoViewIfNeeded(); await el.click(); await page.waitForTimeout(500)
+          await page.locator('[role="menuitem"], [role="option"], [role="menuitemradio"]').filter({ hasText: text }).first().click(); await page.waitForTimeout(2500)
+        }
+        try {
+          await go('/spaces/content?view=board')
+          await page.waitForSelector(card, { timeout: 60000 })
+          // A run that stopped half-way may have left them ticked for this member.
+          if (await page.$(`${card} [data-card-extra]`)) { await setShown(false); await go('/spaces/content?view=board'); await page.waitForSelector(card, { timeout: 60000 }) }
+          ok(!(await page.$(`${card} [data-card-extra]`)), 'Owner, Start, Theme and Pillar are off on cards when unticked')
+          await setShown(true)
+          await page.waitForSelector(`${card} [data-card-owner]`, { timeout: 20000 })
+          ok(true, 'ticked fields show on the card')
+          await pick('owner', other)
+          await pick('theme', `Lab card theme ${n}`)
+          await pick('pillar', `Lab card pillar ${n}`)
+          await pick('priority', 'Low')
+          // Start: a date box with Save.
+          const st = page.locator(`${card} [data-card-edit="start"]`).first(); await st.scrollIntoViewIfNeeded(); await st.click()
+          await page.fill('[data-card-editor="start"] input', '2026-12-03'); await page.click('[data-card-editor-save]'); await page.waitForTimeout(2500)
+          ok(row() === `${other}|Low|2026-12-03|Lab card theme ${n}|Lab card pillar ${n}`, `owner, priority, start, theme and pillar saved from the card: ${row()}`)
+          await go('/spaces/content?view=board')
+          await page.waitForSelector(`${card} [data-card-pillar]`, { timeout: 60000 })
+          ok((await page.textContent(`${card} [data-card-extra]`)).includes(`Lab card pillar ${n}`), 'the card shows the new values after a reload')
+          ok(await page.$(`${card} [data-card-priority="Low"]`) !== null, 'Low shows as a chip when Priority is ticked')
+          // A click on a card field never opens the task panel.
+          ok(!(await page.$('[data-panel-sections]')), 'editing on the card did not open the task')
+          await setShown(false)
+        } finally { drop([t]); psql(`delete from projects where id='${th}'`) }
+      },
+    },
+    {
+      // Owner, 26 Nov 2026: Type, Assignee, Due date, Tags and custom fields (text, choice) edited on the card.
+      id: 'qa-card-edits-standard-and-custom', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd(), t = task(`Lab card std ${n}`)
+        const ft = first(`insert into task_fields (id, kind, name_en, position) values (gen_random_uuid(), 'text', 'Lab card text ${n}', 991) returning id`)
+        const fc = first(`insert into task_fields (id, kind, name_en, options, position) values (gen_random_uuid(), 'choice', 'Lab card pick ${n}', '{"choices":[{"id":"o1","en":"Alpha","color":"#3E7BEA"},{"id":"o2","en":"Beta","color":"#D6409F"}]}', 992) returning id`)
+        psql(`insert into task_type_fields (type_label, field_id, position) values ('Post', '${ft}', 90), ('Post', '${fc}', 91)`)
+        psql(`insert into task_field_values (task_id, field_id, value, updated_at) values ('${t}', '${ft}', '"Old words"', now()), ('${t}', '${fc}', '"o1"', now())`)
+        const tg1 = first(`insert into tags (id, name, key, color) values (gen_random_uuid(), 'Lab card tag A ${n}', 'lab-card-a-${n}', '#3E7BEA') returning id`)
+        const tg2 = first(`insert into tags (id, name, key, color) values (gen_random_uuid(), 'Lab card tag B ${n}', 'lab-card-b-${n}', '#3E7BEA') returning id`)
+        psql(`insert into task_tags (task_id, tag_id) values ('${t}', '${tg1}')`)
+        const other = psql(`select name from members where email='${EMAIL.design}'`)
+        const otherType = psql(`select label from content_types where label = 'Article'`)
+        const val = f => psql(`select coalesce(value::text,'-') from task_field_values where task_id='${t}' and field_id='${f}'`)
+        const card = `[data-task-card="${t}"]`
+        const tick = async on => {
+          await page.click('[data-fields-button]')
+          await page.waitForSelector(`[data-fields-menu] [data-view-field="f:${ft}"]`, { timeout: 20000 })
+          for (const k of [`f:${ft}`, `f:${fc}`]) { if (on) await page.check(`[data-fields-menu] [data-view-field="${k}"]`); else await page.uncheck(`[data-fields-menu] [data-view-field="${k}"]`); await page.waitForTimeout(400) }
+          await page.keyboard.press('Escape'); await page.waitForTimeout(800)
+        }
+        const open = async key => { const el = page.locator(`${card} [data-card-edit="${key}"]`).first(); await el.scrollIntoViewIfNeeded(); await el.click(); await page.waitForTimeout(500) }
+        const pick = async (key, text) => { await open(key); await page.locator('[role="menuitem"], [role="option"], [role="menuitemradio"]').filter({ hasText: text }).first().click(); await page.waitForTimeout(2500) }
+        try {
+          await go('/spaces/content?view=board')
+          await page.waitForSelector(card, { timeout: 60000 })
+          await tick(true)
+          await page.waitForSelector(`${card} [data-card-field="${ft}"]`, { timeout: 20000 })
+          // Custom text: a box with Save.
+          await open(`f:${ft}`); await page.fill(`[data-card-editor="f:${ft}"] input`, 'New words'); await page.click('[data-card-editor-save]'); await page.waitForTimeout(2500)
+          ok(val(ft) === '"New words"', `custom text saved from the card: ${val(ft)}`)
+          await pick(`f:${fc}`, 'Beta')
+          ok(val(fc) === '"o2"', `custom choice saved from the card: ${val(fc)}`)
+          await pick('assignee', other)
+          ok(psql(`select (select name from members where id=assignee_id) from tasks where id='${t}'`) === other, 'assignee saved from the card')
+          await pick('tags', `Lab card tag B ${n}`)
+          ok(psql(`select count(*) from task_tags where task_id='${t}'`) === '2', 'a second tag added from the card')
+          await open('due'); await page.fill('[data-card-editor="due"] input', '2026-12-24'); await page.click('[data-card-editor-save]'); await page.waitForTimeout(2500)
+          ok(psql(`select due_date::date::text from tasks where id='${t}'`) === '2026-12-24', 'due date saved from the card')
+          if (otherType) { await pick('type', otherType); ok(psql(`select content_type_label from tasks where id='${t}'`) === otherType, `type changed from the card to ${otherType}`) }
+          ok(!(await page.$('[data-panel-sections]')), 'editing on the card did not open the task')
+          await tick(false)
+        } finally { drop([t]); psql(`delete from task_fields where id in ('${ft}','${fc}')`); psql(`delete from tags where id in ('${tg1}','${tg2}')`) }
       },
     },
   ]

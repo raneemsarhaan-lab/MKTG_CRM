@@ -30,7 +30,7 @@ export function TaskPanel({ data, spaceId = null }: { data: BoardData; /** Spec 
   if (!task) return null
   return (
     // Spec 023: the panel's task fields (Channels, Caption, TOV…) read the page's field data.
-    <CardFieldsProvider fields={data.taskFields} links={data.typeFields} values={data.fieldValues} types={data.contentTypes} members={data.members} tags={data.tags} spaces={data.spaces} viewSpaceId={spaceId} promoted={data.standardFields}
+    <CardFieldsProvider fields={data.taskFields} links={data.typeFields} values={data.fieldValues} types={data.contentTypes} members={data.members} tags={data.tags} spaces={data.spaces} viewSpaceId={spaceId} promoted={data.standardFields} themes={data.themes}
       taskName={id => tasks.find(x => x.id === id)?.name}>
     <TaskModal
       stageNameOf={spaceId && ss ? s => ss.stageName(s) : undefined}

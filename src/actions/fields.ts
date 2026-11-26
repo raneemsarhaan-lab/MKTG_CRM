@@ -137,7 +137,7 @@ export async function createSpaceField(input: { name: string; kind: string; spac
 }
 
 /** One person's columns in one sheet view; null puts the Space's default back. */
-export async function setMyColumns(viewKey: string, layout: { cols: string[]; widths?: Record<string, number> } | null): Promise<Ok | Fail> {
+export async function setMyColumns(viewKey: string, layout: { cols: string[]; widths?: Record<string, number>; known?: string[] } | null): Promise<Ok | Fail> {
   const me = await getSessionMember()
   if (!me) return { success: false, error: 'not_authenticated' }
   if (typeof viewKey !== 'string' || !/^[\w:-]{1,120}$/.test(viewKey)) return { success: false, error: 'invalid' }
@@ -150,7 +150,8 @@ export async function setMyColumns(viewKey: string, layout: { cols: string[]; wi
     for (const [k, w] of Object.entries(isObj(layout.widths) ? layout.widths : {})) {
       if (typeof w === 'number' && Number.isFinite(w) && k.length <= 60) widths[k] = Math.max(60, Math.min(600, Math.round(w)))
     }
-    all[viewKey] = { cols: [...new Set(cols)], widths }
+    const known = (Array.isArray(layout.known) ? layout.known : []).filter(k => typeof k === 'string' && k.length <= 60).slice(0, 300)
+    all[viewKey] = { cols: [...new Set(cols)], widths, ...(known.length ? { known: [...new Set(known)] } : {}) }
   }
   await prisma.member.update({ where: { id: me.id }, data: { sheet_layouts: all as object } })
   return { success: true }

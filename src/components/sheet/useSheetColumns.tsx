@@ -154,7 +154,7 @@ export function useSheetColumns(given: UseSheetColumns) {
     setMine({ key: pv.viewKey, layout: next })
     return pv.save(next)
   }
-  const current = (): PersonalLayout => ({ cols: laid.filter(c => c.shown).map(c => c.key), widths: myLayout?.widths ?? {} })
+  const current = (): PersonalLayout => ({ cols: laid.filter(c => c.shown).map(c => c.key), widths: myLayout?.widths ?? {}, known: laid.map(c => c.key) })
   function doShown(key: string, on: boolean) {
     if (!personalMode) return api.setShown(sheet, key, set, on)
     const cur = current()

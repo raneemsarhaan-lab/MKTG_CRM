@@ -4444,5 +4444,28 @@
       "Idle": "Idle",
       "OnTrack": "On Track"
     }
+  },
+  "cardEdit": {
+    "assignee": "Assignee",
+    "unassigned": "Unassigned",
+    "tags": "Tags",
+    "publish": "Publishing date",
+    "start": "Start date",
+    "save": "Save",
+    "cancel": "Cancel",
+    "notSaved": "Not saved. Try again.",
+    "notYours": "You can only change tasks you own or are assigned to.",
+    "invalid": "That isn’t a valid value.",
+    "change": "Change {field}",
+    "owner": "Owner",
+    "theme": "Theme",
+    "pillar": "Pillar",
+    "noTheme": "No theme",
+    "noPillar": "No pillar",
+    "themeFirst": "Choose a theme first.",
+    "ownerLine": "Owner {name}",
+    "startLine": "Start {date}",
+    "empty": "—",
+    "dueLine": "Due {date}"
   }
 }

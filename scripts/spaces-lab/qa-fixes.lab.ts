@@ -7,6 +7,8 @@ import { matchTask, parseQuery, words, type Searchable } from '../../src/lib/sea
 import { allowedStages, isApprovalStage } from '../../src/lib/stage-moves'
 import { startingSpacesFor, DEFAULT_SPACES } from '../../src/lib/spaces'
 import { readDay, readPlan } from '../../src/components/content/parse-plan'
+import { applyPersonal } from '../../src/lib/sheet-columns'
+import { shownFields } from '../../src/lib/view-config'
 
 let bad = 0
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -76,6 +78,20 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   check('F23 no headings: a column of dates is the publishing date', JSON.stringify(dated.rows.map(r => r.date)) === '["2026-11-24","2026-12-01"]', dated.rows.map(r => [r.title, r.date]))
   const headed = readPlan([[cell('Title'), cell('Publishing date')], [cell('Reel'), cell('2026-12-05')]])
   check('F23 with headings: the Date column is read', headed.rows[0]?.title === 'Reel' && headed.rows[0]?.date === '2026-12-05', headed.rows[0])
+}
+
+// Owner, 26 Nov 2026: a person's own columns — a column added later (a new field) shows as by default;
+// one they hid stays hidden. Cards: Owner, Start, Theme and Pillar are listed but off by default.
+{
+  const col = (key: string, shown = true) => ({ key, builtIn: true, name: null, width: 120, shown, kind: null, options: [], record: null }) as never
+  const laid = [col('title'), col('status'), col('owner'), col('f:new')]
+  const mine = applyPersonal(laid, { cols: ['title', 'status'], known: ['title', 'status', 'owner'] }) as unknown as { key: string; shown: boolean }[]
+  check('Own columns: a field added since shows', mine.find(c => c.key === 'f:new')?.shown === true, mine)
+  check('Own columns: a column they hid stays hidden', mine.find(c => c.key === 'owner')?.shown === false, mine)
+  const old = applyPersonal(laid, { cols: ['title', 'status'] }) as unknown as { key: string; shown: boolean }[]
+  check('Own columns saved before: unchanged (unlisted columns hidden)', old.find(c => c.key === 'f:new')?.shown === false, old)
+  const def = shownFields(null, 'board', [], new Set(), [])
+  check('Cards: Owner, Start, Theme, Pillar off by default', !['owner', 'start', 'theme', 'pillar'].some(k => def.includes(k)) && def.includes('due') && def.includes('tags'), def)
 }
 
 console.log(bad ? `\n${bad} failed` : '\nall passed')

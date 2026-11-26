@@ -197,7 +197,11 @@ export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: s
 }
 
 /** Fields (25 Nov 2026): one person's own columns in a sheet view — the keys shown, in order, and widths. */
-export interface PersonalLayout { cols: string[]; widths?: Record<string, number> }
+export interface PersonalLayout {
+  cols: string[]; widths?: Record<string, number>
+  /** Owner, 26 Nov 2026: every column the sheet had when this was saved; a column added since follows the default. */
+  known?: string[]
+}
 
 /**
  * A person's own view over the Space's default layout: their shown columns, in their order, then the
@@ -214,7 +218,9 @@ export function applyPersonal(laid: LaidColumn[], p: PersonalLayout | null | und
   return order.map(k => {
     const c = byKey.get(k)!
     const w = p.widths?.[k]
-    return { ...c, shown: on.has(k), width: typeof w === 'number' ? clampWidth(w) : c.width }
+    // A column added after the layout was saved (a new field) shows as it does by default.
+    const added = !!p.known && !on.has(k) && !p.known.includes(k)
+    return { ...c, shown: added ? c.shown : on.has(k), width: typeof w === 'number' ? clampWidth(w) : c.width }
   })
 }
 

@@ -6,6 +6,7 @@
  * button pass their choice; elsewhere every standard field shows, with the
  * custom fields marked "show on cards".
  */
+import { CardEditTarget } from '@/components/fields/CardEditor'
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { BrandFeatures, ContentType, Member, Tag, TaskFieldDef, TaskFieldValueRow, TaskTypeFieldLink, TeamSpace, StageId } from '@/types/index'
@@ -31,6 +32,8 @@ export interface CardFieldsData {
   viewSpaceId: string | null
   /** Fields (25 Nov 2026): custom fields promoted to Standard (on in every Space). */
   promoted: string[]
+  /** Owner, 26 Nov 2026: themes and their pillars, for a card's Theme › Pillar line and its editor. */
+  themes: { id: string; name: string; pillars: { id: string; name: string }[] }[]
 }
 
 /**
@@ -79,8 +82,11 @@ export function ShownFieldsProvider({ shown, children }: { shown: string[] | nul
 }
 
 const NO_KEYS: string[] = []
-export function CardFieldsProvider({ fields = [], links = [], values = [], types, members, taskName, tags = [], spaces = NO_SPACES, viewSpaceId = null, promoted = NO_KEYS, children }: {
+const NO_THEMES: { id: string; name: string; pillars: { id: string; name: string }[] }[] = []
+export function CardFieldsProvider({ fields = [], links = [], values = [], types, members, taskName, tags = [], spaces = NO_SPACES, viewSpaceId = null, promoted = NO_KEYS, themes = NO_THEMES, children }: {
   fields?: TaskFieldDef[]; links?: TaskTypeFieldLink[]; values?: TaskFieldValueRow[]; types: ContentType[]; members: Member[]; tags?: Tag[]
+  /** Owner, 26 Nov 2026: themes and their pillars, for a card's Theme › Pillar line and its editor. */
+  themes?: { id: string; name: string; pillars: { id: string; name: string }[] }[]
   spaces?: TeamSpace[]; viewSpaceId?: string | null; promoted?: string[]
   taskName?(id: string): string | undefined; children: ReactNode
 }) {
@@ -90,7 +96,7 @@ export function CardFieldsProvider({ fields = [], links = [], values = [], types
     for (const v of values) { let x = m.get(v.task_id); if (!x) m.set(v.task_id, (x = new Map())); x.set(v.field_id, v.value) }
     return m
   }, [values])
-  const value = useMemo(() => ({ shown, fields, links, values: byTask, types, members, taskName, tags, spaces, viewSpaceId, promoted }), [shown, fields, links, byTask, types, members, taskName, tags, spaces, viewSpaceId, promoted])
+  const value = useMemo(() => ({ shown, fields, links, values: byTask, types, members, taskName, tags, spaces, viewSpaceId, promoted, themes }), [shown, fields, links, byTask, types, members, taskName, tags, spaces, viewSpaceId, promoted, themes])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
@@ -126,15 +132,19 @@ export function CardFieldValues({ taskId, typeLabel, status, brand, homeSpaceId 
       {missing.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0 8px' }}>
           {missing.map(({ field }) => (
-            <span key={field.id} data-card-missing={field.name_en} style={{ fontSize: 10.5, fontWeight: 700, color: '#D22040' }}>{t('missingCard', { field: fieldName(field, locale) })}</span>
+            <CardEditTarget key={field.id} task={{ id: taskId }} field={`f:${field.id}`} label={fieldName(field, locale)}>
+              <span data-card-missing={field.name_en} style={{ fontSize: 10.5, fontWeight: 700, color: '#D22040' }}>{t('missingCard', { field: fieldName(field, locale) })}</span>
+            </CardEditTarget>
           ))}
         </div>
       )}
       {rows.map(({ f, text }) => (
-        <div key={f.id} data-card-field={f.id} style={{ display: 'flex', gap: 5, fontSize: 10.5, lineHeight: 1.35, minWidth: 0 }}>
+        <CardEditTarget key={f.id} task={{ id: taskId }} field={`f:${f.id}`} label={fieldName(f, locale)}>
+        <div data-card-field={f.id} style={{ display: 'flex', gap: 5, fontSize: 10.5, lineHeight: 1.35, minWidth: 0 }}>
           <span style={{ color: PIPE.textFaint, fontWeight: 600, flexShrink: 0 }}>{fieldName(f, locale)}</span>
           <span style={{ color: PIPE.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
         </div>
+        </CardEditTarget>
       ))}
     </div>
   )

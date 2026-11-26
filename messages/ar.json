@@ -4444,5 +4444,28 @@
       "Idle": "خاملة",
       "OnTrack": "في الموعد"
     }
+  },
+  "cardEdit": {
+    "assignee": "المسؤول",
+    "unassigned": "غير مسند",
+    "tags": "الوسوم",
+    "publish": "تاريخ النشر",
+    "start": "تاريخ البدء",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "notSaved": "لم يُحفظ. حاول مرة أخرى.",
+    "notYours": "يمكنك تغيير المهام التي تملكها أو المسندة إليك فقط.",
+    "invalid": "هذه ليست قيمة صحيحة.",
+    "change": "تغيير {field}",
+    "owner": "المالك",
+    "theme": "المحور",
+    "pillar": "الركيزة",
+    "noTheme": "بدون محور",
+    "noPillar": "بدون ركيزة",
+    "themeFirst": "اختر محورًا أولًا.",
+    "ownerLine": "المالك {name}",
+    "startLine": "البداية {date}",
+    "empty": "—",
+    "dueLine": "التسليم {date}"
   }
 }
