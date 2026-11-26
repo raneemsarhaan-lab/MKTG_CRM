@@ -347,10 +347,14 @@ export function TaskCard({
   // this is read after it, so status, due date and people are not lost
   // behind the label.
   const { alert, dueLabel } = cardFacts(task, slaConfig, today)
+  // QA 26 Nov 2026 (QF-16): read the people the card shows — its assignees, lead first — and the owner apart.
+  const cardCtx = useCardFields()
+  const assigned = (task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])).map(id => cardCtx?.members.find(m => m.id === id)?.name).filter((x): x is string => !!x)
   const summary = [
     alert,
     dueLabel || 'No due date',
-    `Assigned to ${assigneesOf(task, currentStageOwner).map(m => m.name).join(' and ')}`,
+    assigned.length ? `Assigned to ${assigned.join(' and ')}` : `Assigned to ${assigneesOf(task, currentStageOwner).map(m => m.name).join(' and ')}`,
+    assigned.length && task.task_owner && !(task.assignee_ids ?? []).includes(task.task_owner.id) && task.assignee_id !== task.task_owner.id ? `Owner ${task.task_owner.name}` : '',
     task.brand?.name ?? 'No brand',
     task.project?.name ?? 'No project',
     task.parent ? `Clip of ${task.parent.name}` : '',

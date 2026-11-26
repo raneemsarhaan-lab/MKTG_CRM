@@ -117,7 +117,7 @@ export function SearchDialog() {
             <Bold text={x.name} words={x.hit.field === 'name' ? x.hit.bold : []} />
           </span>
           <span style={{ fontSize: 12, color: PIPE.textMuted }}>
-            {[x.space?.name, stage(x.status)].filter(Boolean).join(' · ')}
+            {[x.space?.name, x.stage_name || stage(x.status)].filter(Boolean).join(' · ')}
             {w && <> · <span data-search-where={x.hit.field} style={{ color: PIPE.textSecondary, fontWeight: 600 }}>{w}</span></>}
           </span>
           {x.hit.snippet && <span style={{ fontSize: 12.5, color: PIPE.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><Bold text={x.hit.snippet} words={x.hit.bold} /></span>}

@@ -101,7 +101,8 @@ export const TASK_BUILT_INS: BuiltInColumn[] = [
   { key: 'due', width: 130, en: 'Due date' },
   { key: 'type', width: 110, en: 'Type' },
   { key: 'priority', width: 90, en: 'Priority' },
-  { key: 'platform', width: 110, en: 'Platform' },
+  // QA 26 Nov 2026 (QF-07): Platform is hidden; Channels is the field (old values are kept).
+  { key: 'platform', width: 110, en: 'Platform', hidden: true },
   // Fields (25 Nov 2026): Owner is a standard field.
   { key: 'owner', width: 140, en: 'Owner', hidden: true },
 ]

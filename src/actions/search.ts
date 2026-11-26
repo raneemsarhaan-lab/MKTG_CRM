@@ -14,6 +14,8 @@ import type { StageId } from '@/types/index'
 
 export interface TaskResult {
   id: string; name: string; status: StageId; open: boolean
+  /** QA 26 Nov 2026 (QF-04): the stage's name in the result's Space; null shows the original name. */
+  stage_name?: string | null
   brand: { id: string; name: string; color: string } | null
   space: { id: string; key: string; name: string } | null
   publish_date: string | null
@@ -88,10 +90,19 @@ export async function searchWorkspace(raw: string, opts: { spaceKey?: string | n
   })
   const ctx = { spaceId: ctxSpace, brandId: opts.brandId ?? null, today: new Date().toISOString().slice(0, 10) }
   const ranked = rank(rows, q, ctx)
+  // QA 26 Nov 2026 (QF-04): a result names the stage as its Space does (the task's own step there, else the first).
+  const stageRows = await prisma.spaceStage.findMany({ select: { id: true, space_id: true, stage_id: true, name: true, position: true }, orderBy: { position: 'asc' } })
+  const ownSteps = await prisma.taskSpaceStage.findMany({ where: { task_id: { in: rows.map(r => r.id) } }, select: { task_id: true, space_id: true, space_stage_id: true } })
+  const stepOf = new Map(ownSteps.map(x => [`${x.task_id}|${x.space_id}`, x.space_stage_id]))
+  const spaceStageName = (taskId: string, spaceId: string, stage: string) => {
+    const mine = stepOf.get(`${taskId}|${spaceId}`)
+    const row = (mine ? stageRows.find(x => x.id === mine && x.stage_id === stage) : undefined) ?? stageRows.find(x => x.space_id === spaceId && x.stage_id === stage)
+    return row?.name ?? null
+  }
   const result = (r: (typeof rows)[number], hit: Hit): TaskResult => {
     const sid = (ctxSpace && r.space_ids.includes(ctxSpace) ? ctxSpace : r.space_ids[0]) ?? null
     const sp = sid ? spaceById.get(sid) ?? null : null
-    return { id: r.id, name: r.name, status: r.status, open: r.open, brand: r.brand, space: sp, publish_date: r.publish_date, hit }
+    return { id: r.id, name: r.name, status: r.status, stage_name: sid ? spaceStageName(r.id, sid, r.status) : null, open: r.open, brand: r.brand, space: sp, publish_date: r.publish_date, hit }
   }
 
   // Assets: files on tasks and in brand folders, by file name.

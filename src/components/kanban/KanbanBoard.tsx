@@ -1416,7 +1416,8 @@ function KanbanBoardInner({
           boardTasks={boardTasks}
           noThemeAdd={brandBoard && !tabSheet}
           boardFiltered={boardTab && (narrowed || scope === 'me' || activeFilterCount(filters) > 0)}
-          stages={sheetSpace?.key === 'video' && !spaceId ? videoStages : contentStages}
+          // QA 26 Nov 2026 (QF-03): a Brand page shows the original stage names in every view, as its Board does.
+          stages={brandBoard && !spaceId ? null : sheetSpace?.key === 'video' && !spaceId ? videoStages : contentStages}
           tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
           themes={tabSheet
             ? tabThemes.filter(th => th.sheet_id === tabSheet.id)

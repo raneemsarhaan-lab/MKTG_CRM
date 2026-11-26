@@ -10,6 +10,8 @@
  * (Samaa for the content plan) owns its pieces, and the sheet works by
  * assignee.
  */
+import { useCardFields } from '@/components/fields/CardFields'
+import { TypePill, useTypeLook } from '@/components/types/TypePill'
 import { useAddLabel } from '@/components/spaces/addLabel'
 import { withCommentPaste, withNumberFormats } from '@/components/sheet/linkedNumbers'
 import { pasteComments as pasteCommentsTo } from '@/components/sheets/format/bus'
@@ -174,6 +176,8 @@ export function ContentGrid(p: ContentGridProps) {
       return err
     })
   }
+  const typeLook = useTypeLook()
+  const cardTypes = useCardFields()?.types
   const typeWord = (label: string) => shownWord(label, viewRef.current.words?.type, viewRef.current.show, label)
   /** Typed or pasted text in Status or Type, as the value it stands for (null: not one). */
   function readWord(col: 'status' | 'type', text: string): string | null {
@@ -188,7 +192,9 @@ export function ContentGrid(p: ContentGridProps) {
     }
     const own = wordValue(text, v.words?.type)
     if (own) return own
-    return (p.contentTypes ?? []).find(x => normTitle(x.label) === normTitle(text))?.label ?? null
+    // QA 26 Nov 2026 (QF-06): a type's Arabic name reads as the type too.
+    const byAr = (cardTypes ?? []).find(x => !!x.name_ar && normTitle(x.name_ar) === normTitle(text))?.label
+    return (p.contentTypes ?? []).find(x => normTitle(x.label) === normTitle(text))?.label ?? byAr ?? null
   }
   const byId = new Map(p.members.map(m => [m.id, m]))
   const taskOf = (row: ContentRow): Task | null => (row.kind === 'piece' || row.kind === 'clip' ? row.task : null)
@@ -245,8 +251,8 @@ export function ContentGrid(p: ContentGridProps) {
   function typePill(label: string | null | undefined) {
     if (!label) return null
     // Sheet look (25 Nov 2026): a soft pill like Status — the type's colour as a tint, a dot and darker text.
-    const c = contentTypeColor(label)
-    return <span className="fx-content-type is-soft" style={{ ['--type-c' as string]: c }}><i className="fx-sheet-dot" style={{ background: c }} /><span className="fx-sheet-ellipsis">{typeWord(label)}</span></span>
+    // QA 26 Nov 2026 (QF-05, QF-06): the type's own colour, icon and (in Arabic) name from Settings.
+    return <TypePill label={label} word={typeWord(label)} look={typeLook} />
   }
 
   function linkCell(task: Task, col: typeof LINK_COLS[number], can: boolean) {

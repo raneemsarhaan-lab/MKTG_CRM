@@ -15,6 +15,7 @@
  * A sheet passes its built-in default names and plugs the returned pieces
  * into its grid model, toolbar and popups.
  */
+import { TypePill, useTypeLook } from '@/components/types/TypePill'
 import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { ColumnKind, Member, SheetId, Task } from '@/types/index'
@@ -74,6 +75,7 @@ export interface UseSheetColumns {
 }
 
 export function useSheetColumns(given: UseSheetColumns) {
+  const typeLook = useTypeLook()
   const fieldNames = useMemo(() => new Map((given.fields ?? []).map(f => [f.key, f.name])), [given.fields])
   const o: UseSheetColumns = {
     ...given,
@@ -416,8 +418,8 @@ export function useSheetColumns(given: UseSheetColumns) {
     }
     setPopup({
       kind: 'combo', anchor, label: o.defaultName('type'), current: task.content_type_label || null,
-      items: types.map(x => ({ key: x.label, text: x.label, render: hl => <span className="fx-content-type" style={{ background: contentTypeColor(x.label) }}>{hl(x.label)}</span> })),
-      add: { label: name => t('combo.addType', { name }), hint: t('combo.typeHint'), allowed: me.access === 'admin', deniedHint: t('combo.askAdmin') },
+      items: types.map(x => ({ key: x.label, text: x.label, render: hl => <TypePill label={x.label} look={typeLook} highlight={hl} /> })),
+      add: { label: name => t('combo.addType', { name }), hint: t('combo.typeHint'), allowed: me.access === 'admin' || me.access === 'superuser', deniedHint: t('combo.askAdmin') },
       onPick: label => { close(true); onPick(label) },
       onAdd: async name => {
         close(true)

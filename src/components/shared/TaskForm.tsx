@@ -212,7 +212,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         description:        form.description || undefined,
         brand_id:           form.brand_id,
         content_type_label: form.content_type_label,
-        platform:           featureOn(brands.find(b => b.id === form.brand_id), 'platform') ? form.platform : undefined,
+        platform:           undefined,
         task_owner_id:      form.task_owner_id,
         assignee_id:        form.assignee_id,
         publish_date:       form.publish_date || null,
@@ -241,7 +241,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         description:        form.description || undefined,
         brand_id:           form.brand_id,
         content_type_label: form.content_type_label,
-        platform:           featureOn(brands.find(b => b.id === form.brand_id), 'platform') ? form.platform : undefined,
+        platform:           undefined,
         task_owner_id:      form.task_owner_id,
         assignee_id:        form.assignee_id,
         publish_date:       form.publish_date || null,
@@ -572,7 +572,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
             ) : (
               <>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {on('platform') && (
+            {/* QA 26 Nov 2026 (QF-07): Platform is replaced by Channels; it is no longer asked or saved. */}
+            {false && on('platform') && (
               <FieldPill label="Platform" value={form.platform} active width={190}>
                 {closePill => PLATFORMS.map(p => (
                   <PillOption

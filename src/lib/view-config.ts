@@ -14,7 +14,7 @@ export type ViewFilterKey = 'brand' | 'assignee' | 'type' | 'campaign' | 'status
  * values even after a Space turns the field off (it then says so).
  */
 export type FieldViewKey = `f:${string}` | 'priority' | 'pillar' | 'start' | 'platform'
-export const BUILT_IN_VIEW_FIELDS: FieldViewKey[] = ['priority', 'pillar', 'start', 'platform']
+export const BUILT_IN_VIEW_FIELDS: FieldViewKey[] = ['priority', 'pillar', 'start'] // QF-07: no Platform
 export const isFieldViewKey = (k: unknown): k is FieldViewKey => typeof k === 'string' && (CUSTOM_FIELD.test(k) || (BUILT_IN_VIEW_FIELDS as string[]).includes(k))
 export type ViewGroup = 'stage' | 'brand' | 'statusGroup' | FieldViewKey
 export type ViewSort = 'due' | 'publish' | 'name' | 'priority' | 'stage' | FieldViewKey
@@ -22,7 +22,7 @@ export type ViewSort = 'due' | 'publish' | 'name' | 'priority' | 'stage' | Field
 export const HAS_VALUE = '__set'
 export const VIEW_FILTERS: ViewFilterKey[] = ['brand', 'assignee', 'type', 'campaign', 'statusGroup', 'tag']
 export const VIEW_SORTS: ViewSort[] = ['due', 'publish', 'name', 'priority', 'stage']
-export const VIEW_FIELDS = ['brand', 'status', 'assignee', 'publish', 'start', 'due', 'type', 'priority', 'platform', 'tags'] as const
+export const VIEW_FIELDS = ['brand', 'status', 'assignee', 'publish', 'start', 'due', 'type', 'priority', 'tags'] as const // QF-07: no Platform
 
 /** Spec 023: a custom field shows as `f:<field id>` beside the standard fields. */
 export const CUSTOM_FIELD = /^f:[0-9a-f-]{36}$/i

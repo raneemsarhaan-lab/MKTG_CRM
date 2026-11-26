@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useEffect, useId, useRef, useState } from 'react'
 import { COLORS } from '@/lib/tokens'
 
@@ -101,7 +102,9 @@ export function InlineValue({
   useEffect(() => { if (!editing) setDraft(String(value ?? '')) }, [value, editing])
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
 
-  const EMPTY = <Empty label={emptyLabel ?? 'Empty'} />
+  // QA 26 Nov 2026 (QF-14): "Empty" in the reader's language.
+  const tEmpty = useTranslations('panel')('empty')
+  const EMPTY = <Empty label={emptyLabel ?? tEmpty} />
 
   if (!canEdit) {
     return <div style={{ ...VALUE, padding: '3px 6px' }}>{display || EMPTY}</div>

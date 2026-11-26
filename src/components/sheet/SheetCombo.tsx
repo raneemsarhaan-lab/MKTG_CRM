@@ -58,9 +58,12 @@ export function SheetCombo({ label, items, current, typed, placeholder, noMatch,
     const i = s.toLowerCase().indexOf(nq)
     return i < 0 ? s : <>{s.slice(0, i)}<mark>{s.slice(i, i + nq.length)}</mark>{s.slice(i + nq.length)}</>
   }
-  function choose(r: Row | undefined) {
+  // QA 26 Nov 2026 (QF-02): typing a name and pressing Enter never adds it to the list. The "+ name" row
+  // adds only when clicked, or chosen with the arrow keys and then Enter.
+  const arrowed = useRef(false)
+  function choose(r: Row | undefined, byEnter = false) {
     if (!r) return
-    if (r.kind === 'add') { if (add?.allowed) onAdd?.(r.text); return }
+    if (r.kind === 'add') { if (add?.allowed && (!byEnter || arrowed.current)) onAdd?.(r.text); return }
     onPick(r.kind === 'clear' ? '' : r.item.key)
   }
 
@@ -79,11 +82,11 @@ export function SheetCombo({ label, items, current, typed, placeholder, noMatch,
         name="combo-search"
         autoComplete="off"
         spellCheck={false}
-        onChange={e => { setQ(e.target.value); setSel(0) }}
+        onChange={e => { setQ(e.target.value); setSel(0); arrowed.current = false }}
         onKeyDown={e => {
-          if (e.key === 'ArrowDown') { e.preventDefault(); setSel((at + 1) % Math.max(1, rows.length)) }
-          else if (e.key === 'ArrowUp') { e.preventDefault(); setSel((at - 1 + rows.length) % Math.max(1, rows.length)) }
-          else if (e.key === 'Enter') { e.preventDefault(); choose(rows[at]) }
+          if (e.key === 'ArrowDown') { e.preventDefault(); arrowed.current = true; setSel((at + 1) % Math.max(1, rows.length)) }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); arrowed.current = true; setSel((at - 1 + rows.length) % Math.max(1, rows.length)) }
+          else if (e.key === 'Enter') { e.preventDefault(); choose(rows[at], true) }
         }}
       />
       <div className="fx-sheet-combo-list" id="fx-sheet-combo-list" role="listbox" aria-label={label}>

@@ -239,7 +239,8 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
       case 'due': return x.due_date ?? ''
       case 'publish': return x.publish_date ?? ''
       case 'start': return x.start_date ?? ''
-      case 'type': return x.content_type_label ?? ''
+      // QA 26 Nov 2026 (QF-06): the type's Arabic name in Arabic.
+      case 'type': { const ty = data.contentTypes.find(c => c.label === x.content_type_label); return (locale.startsWith('ar') && ty?.name_ar) || x.content_type_label || '' }
       case 'priority': return x.priority ? t(`priority.${x.priority}`) : ''
       case 'platform': return x.platform ?? ''
       case NOTES: return mine[x.id] ?? ''
@@ -351,7 +352,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
         return p ? patch(x, { priority: p }, { priority: p }) : t('badPriority')
       }
       case 'type': {
-        const ty = data.contentTypes.find(c => norm(c.label) === norm(text))
+        const ty = data.contentTypes.find(c => norm(c.label) === norm(text) || (!!c.name_ar && norm(c.name_ar) === norm(text)))
         return ty ? patch(x, { content_type_label: ty.label }, { content_type_label: ty.label }) : t('unknownType', { text })
       }
       case 'brand': {

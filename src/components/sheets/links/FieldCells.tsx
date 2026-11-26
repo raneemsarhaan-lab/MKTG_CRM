@@ -9,6 +9,7 @@
  * already reads (a stage id, a name, a label, a date), so typing and picking
  * go through the same rules and undo.
  */
+import { TypePill, useTypeLook } from '@/components/types/TypePill'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { LinkedTask, Priority, SheetTaskMap, StageId, TaskField } from '@/types/index'
@@ -54,6 +55,7 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(
 /** What a field cell shows on a linked row. */
 export function FieldValue({ field, raw, map, people, plain }: { field: TaskField; raw: string; map: SheetTaskMap; people: FieldChoices['people']; /** The Content look: the Content sheet's underlined "Open task". */ plain?: boolean }) {
   const locale = useLocale()
+  const typeLook = useTypeLook()
   const t = useTranslations('sheets.fields')
   switch (field) {
     case 'stage':
@@ -63,7 +65,7 @@ export function FieldValue({ field, raw, map, people, plain }: { field: TaskFiel
       return <PersonChip member={raw ? { name: raw, avatar_url: p?.avatar ?? undefined } : undefined} empty={t('unassigned')} />
     }
     case 'type':
-      return raw ? <span className="fx-content-type" style={{ background: contentTypeColor(raw) }}>{shownWord(raw, map.words?.type, map.show, raw)}</span> : null
+      return raw ? <TypePill label={raw} word={shownWord(raw, map.words?.type, map.show, raw)} look={typeLook} /> : null
     case 'pillar': case 'theme':
       return raw ? <span className="fx-fd-chip">{raw}</span> : null
     case 'priority':
@@ -99,6 +101,7 @@ export function FieldEditor({ field, task, anchor, choices, map, onPick, onClose
   onPick(value: string): void
   onClose(restore: boolean): void
 }) {
+  const typeLook = useTypeLook()
   const t = useTranslations('sheets.fields')
   const locale = useLocale()
   const raw = task.values[field] ?? ''
@@ -119,7 +122,7 @@ export function FieldEditor({ field, task, anchor, choices, map, onPick, onClose
     items = choices.people.map(p => ({ key: p.id, text: p.name, label: <PersonChip member={{ name: p.name, avatar_url: p.avatar ?? undefined }} />, tone: p.name === raw ? 'next' as const : undefined, onSelect: () => pick(p.name) }))
     if (field === 'assignee') items.push({ key: '', text: t('unassigned'), label: <PersonChip member={undefined} empty={t('unassigned')} />, onSelect: () => pick('') })
   } else if (field === 'type') {
-    items = choices.types.map(x => ({ key: x, text: x, label: <span className="fx-content-type" style={{ background: contentTypeColor(x) }}>{shownWord(x, map.words?.type, map.show, x)}</span>, tone: x === raw ? 'next' as const : undefined, onSelect: () => pick(x) }))
+    items = choices.types.map(x => ({ key: x, text: x, label: <TypePill label={x} word={shownWord(x, map.words?.type, map.show, x)} look={typeLook} />, tone: x === raw ? 'next' as const : undefined, onSelect: () => pick(x) }))
   } else if (field === 'priority') {
     items = PRIORITIES.map(x => ({ key: x, text: x, label: <span className="fx-fd-prio" style={{ color: PRIORITY_COLOR[x] }}><span aria-hidden="true">⚑ </span>{shownWord(x, map.words?.priority, map.show, x)}</span>, tone: x === raw ? 'next' as const : undefined, onSelect: () => pick(x) }))
   } else if (field === 'theme') {

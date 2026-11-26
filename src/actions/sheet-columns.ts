@@ -427,7 +427,8 @@ export async function setValues(columnId: string, entries: { taskId: string; raw
 export async function addContentType(label: string): Promise<{ success: true; label: string } | Fail> {
   const me = await session()
   if (!me) return { success: false, error: 'not_authenticated' }
-  if (me.access !== 'admin') return { success: false, error: 'not_authorized' }
+  // QA 26 Nov 2026 (QF-02, owner): admins and superusers add a type from a sheet's "+ name" row.
+  if (me.access !== 'admin' && me.access !== 'superuser') return { success: false, error: 'not_authorized' }
   const name = normName(label).slice(0, 40)
   if (!name) return { success: false, error: 'name_empty' }
   const all = await prisma.contentType.findMany({ select: { label: true } })

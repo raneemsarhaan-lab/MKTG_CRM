@@ -546,6 +546,7 @@ export function TaskModal({
   initialPreviewId, initialCommentId, initialSection, onOpenSheet,
   spaces = [], taskSpaces = [], linksSection, dueDaysBefore = 7, stageNameOf, sectionOrder,
 }: TaskModalProps) {
+  const tPanel = useTranslations('panel')
   const orderOf = (k: string) => { const i = sectionOrder?.indexOf(k) ?? -1; return i < 0 ? PANEL_SECTIONS.indexOf(k as never) : i }
   const nameOf = (s: StageId) => stageNameOf?.(s) ?? STAGE_META[s]?.label_en ?? s
   const [cmtText, setCmtText]             = useState('')
@@ -1321,7 +1322,7 @@ export function TaskModal({
     {
       key: 'brand', filled: Boolean(task.brand?.name),
       node: (
-        <Field key="brand" icon="brand" label="Brand">
+        <Field key="brand" icon="brand" label={tPanel('brand')}>
           <InlineValue
             canEdit={canEdit} type="select" value={task.brand_id ?? ''}
             display={task.brand?.name ? (
@@ -1332,8 +1333,8 @@ export function TaskModal({
             ) : ''}
             options={brands.map(b => ({ value: b.id, label: b.name }))}
             emptyLabel="–"
-            ariaLabel="Brand"
-            onCommit={v => saveField('Brand', { brand_id: v })}
+            ariaLabel={tPanel('brand')}
+            onCommit={v => saveField(tPanel('brand'), { brand_id: v })}
           />
         </Field>
       ),
@@ -1341,23 +1342,23 @@ export function TaskModal({
     {
       key: 'type', filled: Boolean(task.content_type_label),
       node: (
-        <Field key="type" icon="type" label="Type">
+        <Field key="type" icon="type" label={tPanel('type')}>
           {/* Spec 023: the type's icon and colour; admins add a type from the menu ("+ Type"). */}
           <TypePicker value={task.content_type_label} types={contentTypes} canEdit={canEdit} canAdd={isAdmin}
-            onPick={v => saveField('Type', { content_type_label: v })} />
+            onPick={v => saveField(tPanel('type'), { content_type_label: v })} />
         </Field>
       ),
     },
     {
       key: 'platform', filled: Boolean(task.platform),
       node: (
-        <Field key="platform" icon="platform" label="Platform">
+        <Field key="platform" icon="platform" label={tPanel('platform')}>
           <InlineValue
             canEdit={canEdit} type="select" value={task.platform ?? ''} display={task.platform}
             options={PLATFORMS.map(p => ({ value: p, label: p }))}
             emptyLabel="–"
-            ariaLabel="Platform"
-            onCommit={v => saveField('Platform', { platform: v })}
+            ariaLabel={tPanel('platform')}
+            onCommit={v => saveField(tPanel('platform'), { platform: v })}
           />
         </Field>
       ),
@@ -1365,7 +1366,7 @@ export function TaskModal({
     {
       key: 'owner', filled: true,
       node: (
-        <Field key="owner" icon="user" label="Owner">
+        <Field key="owner" icon="user" label={tPanel('owner')}>
           <InlineValue
             canEdit={canEdit} type="select" value={task.task_owner_id}
             display={
@@ -1375,8 +1376,8 @@ export function TaskModal({
               </span>
             }
             options={members.map(m => ({ value: m.id, label: m.name }))}
-            ariaLabel="Owner"
-            onCommit={v => saveField('Owner', { task_owner_id: v })}
+            ariaLabel={tPanel('owner')}
+            onCommit={v => saveField(tPanel('owner'), { task_owner_id: v })}
           />
         </Field>
       ),
@@ -1398,7 +1399,7 @@ export function TaskModal({
          step, so there were never going to be enough. */
       key: 'project', filled: Boolean(task.project),
       node: (
-        <Field key="project" icon="folder" label="Project">
+        <Field key="project" icon="folder" label={tPanel('project')}>
           <span style={{
             position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8,
             maxWidth: '100%', minWidth: 0,
@@ -1460,11 +1461,11 @@ export function TaskModal({
          precision beneath the project rather than the only way in. */
       key: 'planstep', filled: Boolean(task.plan_step),
       node: (
-        <Field key="planstep" icon="link" label="Plan step">
+        <Field key="planstep" icon="link" label={tPanel('planStep')}>
           {task.plan_step && confirmUnlink ? (
             // Asked in place, as the close guard asks: unlinking takes effect
             // on the plan straight away, and there is no relink from here.
-            <span role="group" aria-label="Unlink from the plan step"
+            <span role="group" aria-label={tPanel('unlinkPlan')}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
               <span style={{ color: CU.text }}>Unlink this task from the step?</span>
               <button type="button" onClick={handleUnlinkPlan} disabled={isPending}
@@ -1483,7 +1484,7 @@ export function TaskModal({
               <span style={{ color: CU.label, minWidth: 0, overflowWrap: 'anywhere' }}>{task.plan_step.name}</span>
               {canEdit && (
                 <button type="button" ref={unlinkBtnRef} onClick={() => setConfirmUnlink(true)}
-                        aria-label="Unlink from the plan step" title="Unlink from the plan step"
+                        aria-label={tPanel('unlinkPlan')} title={tPanel('unlinkPlan')}
                         className="fx-hov-tint"
                         style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'inline-flex', borderRadius: 5 }}>
                   <Icon name="close" size={12} color={CU.faint} width={2.2} />
@@ -1499,14 +1500,14 @@ export function TaskModal({
     {
       key: 'cover', filled: Boolean(task.cover_image_url),
       node: (
-        <Field key="cover" icon="image" label="Cover image">
+        <Field key="cover" icon="image" label={tPanel('coverImage')}>
           <InlineValue
             canEdit={canEdit} type="text" value={task.cover_image_url ?? ''}
             display={task.cover_image_url ? shortName(task.cover_image_url, 46) : ''}
             placeholder="https://…"
             emptyLabel="–"
-            ariaLabel="Cover image"
-            onCommit={v => saveField('Cover image', { cover_image_url: v })}
+            ariaLabel={tPanel('coverImage')}
+            onCommit={v => saveField(tPanel('coverImage'), { cover_image_url: v })}
           />
         </Field>
       ),
@@ -1514,13 +1515,14 @@ export function TaskModal({
     {
       key: 'stage-since', filled: true,
       node: (
-        <Field key="stage-since" icon="clock" label="In this stage since">
+        <Field key="stage-since" icon="clock" label={tPanel('inStageSince')}>
           <span style={{ color: CU.text }}>{fmtDate(task.stage_date, loc)}</span>
         </Field>
       ),
     },
   ]
-  const fields = allFields.filter(f => !FIELD_FEATURE[f.key] || on(FIELD_FEATURE[f.key]))
+  // QA 26 Nov 2026 (QF-07): Platform is hidden; Channels is the field. Old values stay in the database.
+  const fields = allFields.filter(f => f.key !== 'platform' && (!FIELD_FEATURE[f.key] || on(FIELD_FEATURE[f.key])))
   const emptyCount = fields.filter(f => !f.filled).length
 
   /**
@@ -1583,11 +1585,11 @@ export function TaskModal({
     const items: { id: string; when: Date; dot: string; node: React.ReactNode }[] = [
       {
         id: 'created', when: new Date(task.created_at), dot: CU.green,
-        node: <><strong style={{ fontWeight: 600 }}>{task.task_owner.name}</strong> created this task</>,
+        node: <><strong style={{ fontWeight: 600 }}>{task.task_owner.name}</strong> {tPanel('createdThis', { name: '' }).trim()}</>,
       },
       {
         id: 'stage', when: new Date(task.stage_date), dot: CU.green,
-        node: <>Moved to <strong style={{ fontWeight: 600 }}>{stageMeta.label_en}</strong></>,
+        node: <>{tPanel('movedTo', { stage: '' }).trim()} <strong style={{ fontWeight: 600 }}>{loc.startsWith('ar') ? stageMeta.label_ar : stageMeta.label_en}</strong></>,
       },
       ...topComments.map(c => {
         const atMe = (c.mentions ?? []).includes(currentUser.id)
@@ -1749,12 +1751,12 @@ export function TaskModal({
           )}
 
           <span className="fx-tm-created" style={{ fontSize: 14, color: CU.label, whiteSpace: 'nowrap', marginInlineEnd: 4 }}>
-            Created {fmtShort(task.created_at, loc)}
+            {tPanel('created', { date: fmtShort(task.created_at, loc) })}
           </span>
 
           {/* ⋯ menu */}
           <div ref={menuRef} style={{ position: 'relative' }}>
-            <IconButton name="more" label="Task actions" onClick={() => setMenuOpen(v => !v)} />
+            <IconButton name="more" label={tPanel('taskActions')} onClick={() => setMenuOpen(v => !v)} />
             {menuOpen && (
               <div role="menu" style={{
                 position: 'absolute', top: 36, insetInlineEnd: 0, width: 260, zIndex: 3,
@@ -1765,12 +1767,12 @@ export function TaskModal({
                   display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
                   border: `1px solid ${CU.line}`, borderRadius: 8, overflow: 'hidden', marginBottom: 8,
                 }}>
-                  <MenuSplit label="Copy link" onClick={() => copy('link')} />
-                  <MenuSplit label="Copy ID" onClick={() => copy('id')} divider />
-                  <MenuSplit label="New tab" divider href={`/board?task=${task.id}`}
+                  <MenuSplit label={tPanel('copyLink')} onClick={() => copy('link')} />
+                  <MenuSplit label={tPanel('copyId')} onClick={() => copy('id')} divider />
+                  <MenuSplit label={tPanel('newTab')} divider href={`/board?task=${task.id}`}
                              onClick={() => setMenuOpen(false)} />
                 </div>
-                <MenuItem icon="openIn" label="Open the board behind this"
+                <MenuItem icon="openIn" label={tPanel('openBoard')}
                           onClick={() => { setMenuOpen(false); requestClose() }} />
                 {/* Spec 023 (US7): admins and superusers save a task as a template of its type. */}
                 {currentUser.access !== 'user' && task.content_type_label && !task.parent_task_id && (
@@ -1790,7 +1792,7 @@ export function TaskModal({
             )}
           </div>
 
-          <IconButton name="close" label="Close task" onClick={requestClose} size={18} />
+          <IconButton name="close" label={tPanel('closeTask')} onClick={requestClose} size={18} />
         </div>
 
         {closeGuard && (
@@ -1829,7 +1831,7 @@ export function TaskModal({
             before hydration, is not paid here: the panel only ever opens on a
             tap, long after the page has hydrated. */}
         {isPhone && (
-          <div role="tablist" aria-label="Task sections" style={{
+          <div role="tablist" aria-label={tPanel('taskSections')} style={{
             display: 'flex', gap: 4, padding: '8px 12px 0', flexShrink: 0,
             borderBottom: `1px solid ${CU.line}`,
           }}>
@@ -1886,7 +1888,7 @@ export function TaskModal({
                 <Icon name="target" size={15} color={CU.blue} />
                 Task
               </span>
-              <button type="button" onClick={() => copy('id')} title="Copy task ID"
+              <button type="button" onClick={() => copy('id')} title={tPanel('copyTaskId')}
                       className="fx-hov"
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px',
@@ -1924,7 +1926,7 @@ export function TaskModal({
                 </button>
               )}
               {copied === 'link' && (
-                <span style={{ fontSize: 13, color: CU.label }}>Link copied</span>
+                <span style={{ fontSize: 13, color: CU.label }}>{tPanel('linkCopied')}</span>
               )}
               {copied === 'template' && (
                 <span data-template-saved="" style={{ fontSize: 13, color: CU.label }}>{tTpl('savedFromTask')}</span>
@@ -1939,7 +1941,7 @@ export function TaskModal({
                 <input
                   value={nameText}
                   autoFocus
-                  aria-label="Task name"
+                  aria-label={tPanel('taskName')}
                   name="task-name"
                   autoComplete="off"
                   onChange={e => setNameText(e.target.value)}
@@ -1973,7 +1975,7 @@ export function TaskModal({
                       type="button"
                       ref={titleRef}
                       onClick={() => { setNameText(task.name); setEditingName(true) }}
-                      title="Rename this task"
+                      title={tPanel('renameTask')}
                       className="fx-focus fx-hov-tint"
                       style={{
                         display: 'block', width: 'calc(100% + 16px)', margin: '0 -8px', padding: '0 8px',
@@ -1993,7 +1995,7 @@ export function TaskModal({
                 display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
                 columnGap: 28, rowGap: 2,
               }}>
-                <Prop icon="status" label="Status">
+                <Prop icon="status" label={tPanel('status')}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', position: 'relative' }}>
                     {/* The pill is the picker. The arrow button beside it still
                         does the common thing in one click — this is for the
@@ -2006,7 +2008,7 @@ export function TaskModal({
                       aria-haspopup="listbox"
                       aria-expanded={stageOpen}
                       aria-label={`Stage: ${nameOf(task.status as StageId)}. Change it`}
-                      title="Change the stage"
+                      title={tPanel('changeStage')}
                       className="fx-hov"
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none',
@@ -2021,7 +2023,7 @@ export function TaskModal({
                     </button>
 
                     {stageOpen && (
-                      <div role="listbox" aria-label="Move to a stage" ref={stageMenuRef} style={{
+                      <div role="listbox" aria-label={tPanel('moveToStage')} ref={stageMenuRef} style={{
                         position: 'absolute', top: 'calc(100% + 6px)', insetInlineStart: 0, zIndex: 5,
                         minWidth: 232, maxHeight: 330, overflowY: 'auto', overscrollBehavior: 'contain',
                         background: '#fff', border: `1px solid ${CU.line}`, borderRadius: 10,
@@ -2144,8 +2146,8 @@ export function TaskModal({
                       <InlineValue
                         canEdit={canEdit} type="date" value={task.due_date ?? ''}
                         display={task.due_date ? <>{formatDay(task.due_date, locale)}{task.due_manual && <ManualMark label={tDates('manual')} />}</> : ''}
-                        ariaLabel="Due date"
-                        onCommit={v => saveField('Due date', { due_date: v || null })}
+                        ariaLabel={tPanel('dueDate')}
+                        onCommit={v => saveField(tPanel('dueDate'), { due_date: v || null })}
                       />
                     </span>
                     {daysLeft !== null && (task.status !== 'publish') && (
@@ -2170,7 +2172,7 @@ export function TaskModal({
                   <RepeatEditor taskId={task.id} repeating={!!task.repeat_rule_id} canEdit={canEdit} />
                 </Prop>}
 
-                {on('priorities') && <Prop icon="flag" label="Priority">
+                {on('priorities') && <Prop icon="flag" label={tPanel('priority')}>
                   <InlineValue
                     canEdit={canEdit} type="select" value={task.priority}
                     display={
@@ -2180,23 +2182,23 @@ export function TaskModal({
                       </span>
                     }
                     options={PRIORITIES.map(p => ({ value: p, label: tPri(p) }))}
-                    ariaLabel="Priority"
-                    onCommit={v => saveField('Priority', { priority: v as Priority })}
+                    ariaLabel={tPanel('priority')}
+                    onCommit={v => saveField(tPanel('priority'), { priority: v as Priority })}
                   />
                 </Prop>}
 
-                {on('hours') && <Prop icon="clock" label="Time estimate">
+                {on('hours') && <Prop icon="clock" label={tPanel('timeEstimate')}>
                   <InlineValue
                     canEdit={canEdit} type="number" min={0} step={0.5}
                     value={task.hours_estimate}
                     display={(task.hours_estimate ?? 0) > 0 ? fmtUnit(task.hours_estimate, 'hour', loc) : ''}
-                    ariaLabel="Time estimate"
-                    onCommit={v => saveField('Time estimate', { hours_estimate: parseFloat(v) })}
+                    ariaLabel={tPanel('timeEstimate')}
+                    onCommit={v => saveField(tPanel('timeEstimate'), { hours_estimate: parseFloat(v) })}
                   />
                 </Prop>}
 
-                <Prop icon="folder" label="Pipeline">
-                  <span style={{ color: CU.label }}>{task.nine_stage ? '9-stage' : '8-stage'}</span>
+                <Prop icon="folder" label={tPanel('pipeline')}>
+                  <span style={{ color: CU.label }}>{tPanel('stageCount', { n: (task.nine_stage ? NINE_STAGE : EIGHT_STAGE).length })}</span>
                 </Prop>
               </div>
 
@@ -2279,7 +2281,7 @@ export function TaskModal({
                       />
                     ) : (
                       <p style={{ color: CU.faint, margin: 0 }}>
-                        {canEdit ? 'Add a description…' : 'No description.'}
+                        {canEdit ? tPanel('addDescription') : 'No description.'}
                       </p>
                     )}
 
@@ -2426,7 +2428,7 @@ export function TaskModal({
               height: 52, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2,
               padding: '0 12px 0 18px', borderBottom: `1px solid ${CU.line}`,
             }}>
-              <h2 style={{ flex: 1, margin: 0, fontSize: 17.5, fontWeight: 700, color: CU.ink }}>Activity</h2>
+              <h2 style={{ flex: 1, margin: 0, fontSize: 17.5, fontWeight: 700, color: CU.ink }}>{tPanel('activity')}</h2>
               {/* Search and filter buttons sat here, wired to nothing: left out,
                   like every other control we hold no behaviour for. */}
               <span title={`${task.comments.length} comments`}
@@ -2509,7 +2511,7 @@ export function TaskModal({
                   button, on typing an @, and on typing a # — and filters as
                   you keep typing after it. */}
               {mentionOpen && (
-                <div role="listbox" aria-label="Name someone or link a task" style={{
+                <div role="listbox" aria-label={tPanel('nameOrLink')} style={{
                   position: 'absolute', insetInline: 14, bottom: '100%', marginBottom: 4, zIndex: 4,
                   background: '#fff', border: `1px solid ${CU.line}`, borderRadius: 10,
                   boxShadow: '0 10px 30px rgba(20,20,20,.16)', padding: 6,
@@ -2572,7 +2574,7 @@ export function TaskModal({
               )}
 
               {emojiOpen && (
-                <div role="menu" aria-label="Insert an emoji" style={{
+                <div role="menu" aria-label={tPanel('insertEmoji')} style={{
                   position: 'absolute', insetInline: 14, bottom: '100%', marginBottom: 4, zIndex: 4,
                   background: '#fff', border: `1px solid ${CU.line}`, borderRadius: 10,
                   boxShadow: '0 10px 30px rgba(20,20,20,.16)', padding: 8,
@@ -2610,10 +2612,10 @@ export function TaskModal({
                   onChange={e => { setCmtText(e.target.value); syncMentionQuery(e.target) }}
                   onKeyDown={onComposerKey}
                   onBlur={() => window.setTimeout(() => setMentionOpen(false), 150)}
-                  aria-label="Comment"
+                  aria-label={tPanel('comment')}
                   name="comment"
                   autoComplete="off"
-                  placeholder="Write a comment — @ names, # links a task…"
+                  placeholder={tPanel('commentPlaceholder')}
                   rows={2}
                   style={{
                     width: '100%', boxSizing: 'border-box', border: 'none',
@@ -2668,9 +2670,9 @@ export function TaskModal({
                     <IconButton name="clip" label={ta('attachToComment')}
                                 onClick={() => sectionRef.current?.pick({ forComment: true })} size={16} />
                   )}
-                  <IconButton name="at" label="Mention someone" size={16}
+                  <IconButton name="at" label={tPanel('mention')} size={16}
                               onClick={() => { setEmojiOpen(false); openMentionPicker() }} />
-                  <IconButton name="emoji" label="Insert an emoji" size={16}
+                  <IconButton name="emoji" label={tPanel('insertEmoji')} size={16}
                               onClick={() => { setMentionOpen(false); setEmojiOpen(v => !v) }} />
                   <span style={{ flex: 1 }} />
                   <button

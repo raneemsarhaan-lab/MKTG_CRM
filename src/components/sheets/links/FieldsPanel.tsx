@@ -64,7 +64,7 @@ export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly
   const [q, setQ] = useState('')
   const ref = useRef<HTMLElement>(null)
   useEffect(() => { ref.current?.querySelector<HTMLElement>('button, input, select')?.focus() }, [])
-  const all: TaskField[] = [...TASK_FIELDS.filter(f => f !== 'title'), ...teamCols.map(c => `col:${c.id}` as TaskField)]
+  const all: TaskField[] = [...TASK_FIELDS.filter(f => f !== 'title' && f !== 'platform' /* QF-07 */), ...teamCols.map(c => `col:${c.id}` as TaskField)]
   const name = (f: TaskField) => (f.startsWith('col:') ? teamCols.find(c => `col:${c.id}` === f)?.name ?? f : t(`names.${f}`))
   const colOf = new Map(cols.filter(c => c.field).map(c => [c.field!, c]))
   const taskCol = cols.find(c => c.task)
@@ -165,7 +165,7 @@ export function AddFieldMenu({ anchor, shown, teamCols, linked, onField, onRegul
   onClose(restore: boolean): void
 }) {
   const t = useTranslations('sheets.fields')
-  const fields: TaskField[] = [...TASK_FIELDS.filter(f => f !== 'title'), ...teamCols.map(c => `col:${c.id}` as TaskField)].filter(f => !shown.has(f))
+  const fields: TaskField[] = [...TASK_FIELDS.filter(f => f !== 'title' && f !== 'platform' /* QF-07 */), ...teamCols.map(c => `col:${c.id}` as TaskField)].filter(f => !shown.has(f))
   const name = (f: TaskField) => (f.startsWith('col:') ? teamCols.find(c => `col:${c.id}` === f)?.name ?? f : t(`names.${f}`))
   const items: MenuItem[] = [
     ...fields.map(f => ({ key: f, text: name(f), group: t('fieldsTitle'), label: <span className="fx-fd-mi"><FieldIcon field={f} />{name(f)}</span>, onSelect: () => onField(f) })),
