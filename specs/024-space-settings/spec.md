@@ -71,3 +71,16 @@ no hand-off, which is what Planning did before; it is one setting to change.
 ## Checks (request §10)
 
 See `validation.md`.
+
+## Changed on 25–26 Nov 2026 (owner, release QA review)
+
+Decisions from the owner's answers to the QA review (fixes F01–F31). They replace anything above that says otherwise. Ids are `FR-QA-nn`, shared across specs 022, 024, 026 and 027.
+
+- **FR-QA-02** (F03, F21) A clip is not a separate kind of thing: it is another name for a Video task, with the same Theme › Pillar › Task structure. A task that shows in several Spaces is one task, not linked copies; in each Space it shows with its theme, pillar and all its details.
+- **FR-QA-04** (F05, F06) Admins and superusers may move a task to any stage of its path, skipping approval stages, and repair a task that is off its path. Anyone else may move back, or forward up to and including the next approval stage; stages past it are shown greyed ("after approval").
+- **FR-QA-05** (F01) Every member who isn't an admin has at least one Space: at release each gets the Spaces of their title (unknown titles: Content and Planning), and a new member gets them when added. Release counts report `members.without_space`.
+- **FR-QA-11** (F15, F25, F26) Add buttons use the Space's new-task label ("+ New task" by default). The task panel has no Subtasks section; templates speak of "tasks made with it".
+- **FR-QA-13** (F12, F13) Mine / Everyone is one switch per page, shared by its Board, List, Calendar and Sheet views. The board can group by brand, and filters by brand when it holds two or more.
+- **FR-QA-15** (F31) Checks: `npm run lab:qa` (pure rules) and `scripts/spaces-lab/realapp/scenarios-qa.cjs` (in the app).
+
+- Not changed yet: F22 (the "Videos · No brand" theme's name) waits for the owner. F24 (a hydration warning) could not be reproduced in 6 fresh loads.

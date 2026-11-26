@@ -111,3 +111,17 @@ A member creates a task in any Space. It is a pipeline task with that Space's de
 - Media boards are the Design and Video Spaces.
 - "Content" and "Digital Media" mean the Content Creator and Digital Marketing Specialist roles.
 - The five points in research.md R10–R14 take the recommended defaults until the user says otherwise.
+
+## Changed on 25–26 Nov 2026 (owner, release QA review)
+
+Decisions from the owner's answers to the QA review (fixes F01–F31). They replace anything above that says otherwise. Ids are `FR-QA-nn`, shared across specs 022, 024, 026 and 027.
+
+- **FR-QA-01** (F17, F18, F21) There are no parent tasks, subtasks or child rows. The structure is Theme › Pillar › Task; not every task has a pillar. Rows nested before show flat; their stored link is kept, not deleted. Moving or dropping a row never nests it. Deleting a row that still has rows under it from before moves them up a level unless told otherwise.
+- **FR-QA-02** (F03, F21) A clip is not a separate kind of thing: it is another name for a Video task, with the same Theme › Pillar › Task structure. A task that shows in several Spaces is one task, not linked copies; in each Space it shows with its theme, pillar and all its details.
+- **FR-QA-04** (F05, F06) Admins and superusers may move a task to any stage of its path, skipping approval stages, and repair a task that is off its path. Anyone else may move back, or forward up to and including the next approval stage; stages past it are shown greyed ("after approval").
+- **FR-QA-06** (F04, F16) A task added in a Space's brand folder gets that brand. A Brand page shows only tasks from Spaces the person can open (admins: all), plus their own tasks.
+- **FR-QA-11** (F15, F25, F26) Add buttons use the Space's new-task label ("+ New task" by default). The task panel has no Subtasks section; templates speak of "tasks made with it".
+- **FR-QA-14** (F08) The old /board address opens the task's home Space (or the person's landing page).
+- **FR-QA-15** (F31) Checks: `npm run lab:qa` (pure rules) and `scripts/spaces-lab/realapp/scenarios-qa.cjs` (in the app).
+
+- Not changed yet: F22 (the "Videos · No brand" theme's name) waits for the owner. F24 (a hydration warning) could not be reproduced in 6 fresh loads.

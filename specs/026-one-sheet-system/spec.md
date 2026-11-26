@@ -142,3 +142,17 @@ used as the Sheet view of every Space and Space › Brand folder.
   on a Space page; **the old Sheets section's blank sheets are removed** (kept first as CSV exports).
 - **View tabs**: the home view shows a home icon and a pinned view a pin icon before its name.
 
+## Changed on 25–26 Nov 2026 (owner, release QA review)
+
+Decisions from the owner's answers to the QA review (fixes F01–F31). They replace anything above that says otherwise. Ids are `FR-QA-nn`, shared across specs 022, 024, 026 and 027.
+
+- **FR-QA-01** (F17, F18, F21) There are no parent tasks, subtasks or child rows. The structure is Theme › Pillar › Task; not every task has a pillar. Rows nested before show flat; their stored link is kept, not deleted. Moving or dropping a row never nests it. Deleting a row that still has rows under it from before moves them up a level unless told otherwise.
+- **FR-QA-02** (F03, F21) A clip is not a separate kind of thing: it is another name for a Video task, with the same Theme › Pillar › Task structure. A task that shows in several Spaces is one task, not linked copies; in each Space it shows with its theme, pillar and all its details.
+- **FR-QA-03** (F17) The 'Video' and 'Linked task' columns made on 25 Nov to hold old parents are hidden, not deleted, after their values are recorded in the export `subtasks-parents.csv`.
+- **FR-QA-07** (F27, F29) Make task offers only Spaces the person may add to, with none chosen in advance. A spreadsheet tab (not converted to rows, so its formatting and merged cells stay) offers Make task on titled rows with no task, only when the tab uses the Link task column.
+- **FR-QA-08** (F19, F28) Adding a theme may pick an existing theme from any Space; a name that already exists reuses it. A brand board's sheet hides + Theme where a theme can't be added.
+- **FR-QA-09** (F23) Paste plan reads a Date column (day first: 24/11/2026). With no heading row the first column is the title and other columns are read by what they hold; a plain list is one column only.
+- **FR-QA-10** (F07, F09) Edits made offline wait, say so, and save when the connection is back. An edit made on an older copy is refused ("Someone changed this a moment ago…") instead of overwriting the newer change.
+- **FR-QA-15** (F31) Checks: `npm run lab:qa` (pure rules) and `scripts/spaces-lab/realapp/scenarios-qa.cjs` (in the app).
+
+- Not changed yet: F22 (the "Videos · No brand" theme's name) waits for the owner. F24 (a hydration warning) could not be reproduced in 6 fresh loads.
