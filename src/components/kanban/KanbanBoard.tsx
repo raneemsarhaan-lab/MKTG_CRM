@@ -1,5 +1,6 @@
 'use client'
 
+import { setTaskTags } from '@/actions/tags'
 import { sendOrQueue } from '@/lib/save-queue'
 import { mayCreateIn } from '@/lib/space-settings'
 import { BrandGroupProvider } from '@/components/spaces/brandGroup'
@@ -728,6 +729,14 @@ function KanbanBoardInner({
       const res = await sendOrQueue(() => updateTask(taskId, { ...patch, base })).catch(() => ({ success: false, error: 'generic' }))
       if (!res.success) { patchTask(taskId, { name: before.name, content_type_label: before.content_type_label, assignee_id: before.assignee_id, assignee: before.assignee }); if (res.error === 'changed_meanwhile') router.refresh() }
       else if (!('queued' in res)) router.refresh()
+      return res
+    },
+    // Owner, 26 Nov 2026: a task's tags, set from the sheet's Tags column.
+    async setTags(taskId, tagIds) {
+      const before = tasks.find(t => t.id === taskId)
+      patchTask(taskId, { tag_ids: tagIds })
+      const res = await setTaskTags(taskId, tagIds).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!res.success) patchTask(taskId, { tag_ids: before?.tag_ids ?? [] }); else router.refresh()
       return res
     },
     async updateClip(taskId, patch) {

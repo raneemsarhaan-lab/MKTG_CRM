@@ -18,6 +18,11 @@ export interface SheetTaskPatch {
   content_type_label?: string
   /** Owner, 26 Nov 2026: set from the Brand cell; '' clears it. */
   brand_id?: string
+  /** Owner, 26 Nov 2026: every field is editable in the sheet. */
+  task_owner_id?: string
+  priority?: import('@/types/index').Priority
+  due_date?: string | null
+  start_date?: string | null
 }
 export interface SheetClipPatch {
   clip_no?: number | null

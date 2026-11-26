@@ -21,6 +21,7 @@
  * Its formats, rules and view live on the workbook's Tasks sheet ('tasks:<node>');
  * its columns are that sheet's (spec 010 records keyed by the same id).
  */
+import { setTaskTags } from '@/actions/tags'
 import { FieldGlyph } from '@/components/sheet/AddColumnPanel'
 import { useAddColumn } from '@/components/fields/useAddColumn'
 import { setMyColumns } from '@/actions/fields'
@@ -236,6 +237,10 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
       case 'status': return stageOf(x)
       case 'assignee': return x.assignee_id ? memberName.get(x.assignee_id) ?? '' : ''
       case 'owner': return x.task_owner_id ? memberName.get(x.task_owner_id) ?? '' : ''
+      // Owner, 26 Nov 2026: Tags, Theme and Pillar show (and are typed) here too.
+      case 'tags': return (x.tag_ids ?? []).map(id => data.tags?.find(g => g.id === id)?.name).filter(Boolean).join(', ')
+      case 'theme': return x.project_id ? data.themes.find(th => th.id === x.project_id)?.name ?? x.project?.name ?? '' : ''
+      case 'pillar': return x.pillar_id ? data.themes.flatMap(th => th.pillars).find(pl => pl.id === x.pillar_id)?.name ?? '' : ''
       case 'due': return x.due_date ?? ''
       case 'publish': return x.publish_date ?? ''
       case 'start': return x.start_date ?? ''
@@ -320,6 +325,34 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
       case 'title':
         if (!text) return t('needName')
         return text === x.name ? null : patch(x, { name: text }, { name: text })
+      case 'owner': {
+        const m = matchMember(text, data.members)
+        if (m === 'none') return t('unknownMember', { text })
+        if (m === 'ambiguous') return t('ambiguous', { text })
+        return m.id === x.task_owner_id ? null : patch(x, { task_owner_id: m.id }, { task_owner_id: m.id })
+      }
+      case 'tags': {
+        const names = text.split(/[,،]/).map(s => s.trim()).filter(Boolean)
+        const ids: string[] = []
+        for (const n of names) { const g = data.tags?.find(tg => norm(tg.name) === norm(n)); if (!g) return t('unknownTag', { text: n }); ids.push(g.id) }
+        const r = await setTaskTags(x.id, ids).catch(() => ({ success: false as const, error: 'generic' }))
+        if (!r.success) return t('notSaved', { reason: r.error })
+        router.refresh()
+        return null
+      }
+      case 'theme': {
+        if (!text) return patch(x, { project_id: null }, { project_id: null, pillar_id: null })
+        const th = data.themes.find(th => norm(th.name) === norm(text))
+        if (!th) return t('unknownTheme', { text })
+        return th.id === x.project_id ? null : patch(x, { project_id: th.id }, { project_id: th.id })
+      }
+      case 'pillar': {
+        if (!text) return patch(x, { pillar_id: null }, { pillar_id: null })
+        const th = data.themes.find(th => th.id === x.project_id)
+        const pl = th?.pillars.find(pl => norm(pl.name) === norm(text))
+        if (!pl) return t('unknownPillar', { text, theme: th?.name ?? '—' })
+        return pl.id === x.pillar_id ? null : patch(x, { pillar_id: pl.id }, { pillar_id: pl.id })
+      }
       case 'assignee': {
         if (!text) return patch(x, { assignee_id: null }, { assignee_id: null })
         const m = matchMember(text, data.members)
@@ -489,7 +522,6 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
       if (row.kind !== 'task' || col === NOTES) return null
       if (isCustom(col)) return cl.custom.readOnlyNote(row.task as unknown as Task, col)
       if (col === 'space') return t('spaceReadOnly')
-      if (col === 'owner') return t('ownerInPanel')
       if (!may(row.task)) return t('readOnly')
       if (isField(col) && !fieldApplies(row.task, col)) return tFields('notApplicable')
       if (offFeatureFor(row.task.brand, col)) return tFeat('hidden', { brand: row.task.brand?.name ?? '' })
@@ -581,7 +613,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
   useEffect(() => { if ((!active || activeGone) && firstKey) setActive({ key: firstKey, col: 'title' }) }, [active, activeGone, firstKey])
 
   const addItems: MenuItem[] = addAt ? [
-    ...cl.laid.filter(c => c.builtIn && !c.shown).map(c => ({
+    ...cl.laid.filter(c => c.builtIn && !c.shown && c.key !== 'platform' /* QF-07 */).map(c => ({
       key: c.key, text: cl.nameOf(c.key) || t(`col.${c.key as 'title'}`), group: tf('fieldsTitle'),
       label: cl.nameOf(c.key) || t(`col.${c.key as 'title'}`),
       onSelect: () => { setAddAt(null); void cl.setShown(c.key, true) },

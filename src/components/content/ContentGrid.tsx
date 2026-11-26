@@ -178,6 +178,7 @@ export function ContentGrid(p: ContentGridProps) {
   }
   const typeLook = useTypeLook()
   const cardTypes = useCardFields()?.types
+  const cardTags = useCardFields()?.tags
   const typeWord = (label: string) => shownWord(label, viewRef.current.words?.type, viewRef.current.show, label)
   /** Typed or pasted text in Status or Type, as the value it stands for (null: not one). */
   function readWord(col: 'status' | 'type', text: string): string | null {
@@ -210,7 +211,8 @@ export function ContentGrid(p: ContentGridProps) {
     // Spec 019 stage 2: Status and Type take typed and pasted words too (the menus stay on click and Enter).
     if (col === 'status' && (row.kind === 'piece' || row.kind === 'clip')) return !row.task.dropped_at
     if (row.kind !== 'piece' || row.task.dropped_at || !p.canEdit(row.task)) return false
-    return col === 'title' || col === 'date' || col === 'type'
+    // Owner, 26 Nov 2026: every field is editable here — dates are typed.
+    return col === 'title' || col === 'date' || col === 'type' || col === 'due' || col === 'start'
   }
   const isMenu = (row: ContentRow, col: GridCol) => {
     if (row.kind === 'add' || row.kind === 'draft' || row.kind === 'group') return false
@@ -218,7 +220,7 @@ export function ContentGrid(p: ContentGridProps) {
     if (row.kind === 'line') return col === 'rowNo' || col === 'pillar' || col === 'task'
     if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'clip') return ['rowNo', 'status', 'assignee'].includes(col)
-    return ['rowNo', 'type', 'status', 'media', 'assignee', 'brand', 'pillar', 'doc', 'design', 'task', 'post', 'published', 'archive'].includes(col)
+    return ['rowNo', 'type', 'status', 'media', 'assignee', 'brand', 'owner', 'priority', 'tags', 'pillar', 'doc', 'design', 'task', 'post', 'published', 'archive'].includes(col)
   }
 
   /**
@@ -525,6 +527,11 @@ export function ContentGrid(p: ContentGridProps) {
           const pr = asPriority(task.priority)
           return pr && pr !== 'None' ? <span className="fx-sheet-ellipsis" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ color: priorityColor(pr) }}>⚑</span>{tPri(pr)}</span> : null
         }
+        // Owner, 26 Nov 2026: Tags show (and are set) in the sheet too.
+        case 'tags': {
+          const tags = (task.tag_ids ?? []).map(id => cardTags?.find(x => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
+          return tags.length ? <span className="fx-sheet-ellipsis" style={{ display: 'inline-flex', gap: 4 }}>{tags.map(tg => <span key={tg.id} className="fx-content-type is-soft" style={{ ['--type-c' as string]: tg.color ?? '#6B7280' }}>{tg.name}</span>)}</span> : null
+        }
       }
       return null
     },
@@ -561,6 +568,7 @@ export function ContentGrid(p: ContentGridProps) {
         case 'due': return task.due_date ?? ''
         case 'start': return task.start_date ?? ''
         case 'priority': { const pr = asPriority(task.priority); return pr && pr !== 'None' ? tPri(pr) : '' }
+        case 'tags': return (task.tag_ids ?? []).map(id => cardTags?.find(x => x.id === id)?.name).filter(Boolean).join(', ')
       }
     }
     return model.textValue(row, col) || (col === 'rowNo' ? '' : nodeText(model.render(row, col, () => undefined)).trim())

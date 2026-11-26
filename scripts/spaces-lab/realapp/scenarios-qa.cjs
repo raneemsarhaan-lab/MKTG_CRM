@@ -376,5 +376,66 @@ module.exports = (EMAIL, psql, ok) => {
         } finally { drop([t]); psql(`delete from task_fields where id='${f}'`) }
       },
     },
+    {
+      // Owner, 26 Nov 2026: every field is editable in the Space sheet — Owner, Priority, Tags, Due and Start dates.
+      id: 'qa-space-sheet-edits-every-field', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd(), t = task(`Lab every field ${n}`)
+        const tag = first(`insert into tags (id, name, key, color) values (gen_random_uuid(), 'Lab tag ${n}', 'lab-tag-${n}', '#3E7BEA') returning id`)
+        const other = psql(`select name from members where email='${EMAIL.design}'`)
+        const row = () => psql(`select coalesce((select name from members where id=task_owner_id),'-')||'|'||coalesce(priority,'-')||'|'||coalesce(due_date::date::text,'-')||'|'||coalesce(start_date::date::text,'-')||'|'||(select count(*) from task_tags where task_id='${t}') from tasks where id='${t}'`)
+        try {
+          await go('/spaces/content?view=sheet')
+          await page.waitForSelector('[data-add-field]', { timeout: 60000 })
+          for (const key of ['owner', 'priority', 'due', 'start', 'tags']) {
+            if (await page.$(`[data-cell="k:${t}|${key}"]`)) continue
+            await page.click('[data-add-field]'); await page.waitForTimeout(500)
+            const it = await page.$(`[data-add-item="${key}"] [data-add-do]`)
+            if (it) { await it.click(); await page.waitForTimeout(900) }
+            await page.keyboard.press('Escape')
+          }
+          const pick = async (key, text) => {
+            const c = await page.waitForSelector(`[data-cell="k:${t}|${key}"]`, { timeout: 60000 }); await c.click(); await page.waitForTimeout(500)
+            await page.locator('[role="menuitem"], [role="option"], [role="menuitemradio"]').filter({ hasText: text }).first().click(); await page.waitForTimeout(2000)
+          }
+          const type = async (key, text) => {
+            const c = await page.waitForSelector(`[data-cell="k:${t}|${key}"]`, { timeout: 60000 }); await c.click(); await page.keyboard.type(text); await page.keyboard.press('Enter'); await page.waitForTimeout(2000); await page.keyboard.press('Escape')
+          }
+          await pick('owner', other); await pick('priority', 'Urgent'); await type('due', '20/12/2026'); await type('start', '01/12/2026'); await pick('tags', `Lab tag ${n}`)
+          ok(row() === `${other}|Urgent|2026-12-20|2026-12-01|1`, `owner, priority, due, start and tags saved: ${row()}`)
+        } finally { drop([t]); psql(`delete from tags where id='${tag}'`) }
+      },
+    },
+    {
+      // Owner, 26 Nov 2026: My tasks — Owner, Tags, Theme and Pillar typed in the sheet.
+      id: 'qa-mytasks-edits-every-field', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd(), t = task(`Lab my every field ${n}`)
+        const th = first(`insert into projects (id, name, standing, is_theme) values (gen_random_uuid(), 'Lab my theme ${n}', true, true) returning id`)
+        psql(`insert into content_themes (id, project_id, space_id, position) values (gen_random_uuid(), '${th}', '${space('content')}', -5)`)
+        psql(`insert into content_pillars (id, project_id, name, sort_order) values (gen_random_uuid(), '${th}', 'Lab my pillar ${n}', 0)`)
+        const tag = first(`insert into tags (id, name, key, color) values (gen_random_uuid(), 'Lab my tag ${n}', 'lab-my-tag-${n}', '#3E7BEA') returning id`)
+        const other = psql(`select name from members where email='${EMAIL.design}'`)
+        const row = () => psql(`select coalesce((select name from members where id=task_owner_id),'-')||'|'||coalesce((select name from projects where id=project_id),'-')||'|'||coalesce((select name from content_pillars where id=pillar_id),'-')||'|'||(select count(*) from task_tags where task_id='${t}') from tasks where id='${t}'`)
+        try {
+          await go('/me?view=sheet')
+          await page.waitForSelector('[data-add-field]', { timeout: 60000 })
+          // My tasks' "+" menu lists the fields not shown yet, by name.
+          for (const name of ['Owner', 'Tags', 'Theme', 'Pillar']) {
+            await page.click('[data-add-field]'); await page.waitForTimeout(500)
+            const it = page.locator('[role="menuitem"]').filter({ hasText: new RegExp(`^${name}$`) }).first()
+            if (await it.count()) { await it.click(); await page.waitForTimeout(900) } else await page.keyboard.press('Escape')
+          }
+          await page.click('[data-add-field]'); await page.waitForTimeout(500)
+          ok(!(await page.locator('[role="menuitem"]').filter({ hasText: /^Platform$/ }).count()), 'Platform is not offered (QF-07)')
+          await page.keyboard.press('Escape')
+          const type = async (key, text) => {
+            const c = await page.waitForSelector(`[data-task-sheet] [data-cell$="${t}|${key}"]`, { timeout: 60000 }); await c.click(); await page.keyboard.type(text); await page.keyboard.press('Enter'); await page.waitForTimeout(2200); await page.keyboard.press('Escape')
+          }
+          await type('owner', other); await type('theme', `Lab my theme ${n}`); await type('pillar', `Lab my pillar ${n}`); await type('tags', `Lab my tag ${n}`)
+          ok(row() === `${other}|Lab my theme ${n}|Lab my pillar ${n}|1`, `owner, theme, pillar and tags saved: ${row()}`)
+        } finally { drop([t]); psql(`delete from tags where id='${tag}'`); psql(`delete from projects where id='${th}'`) }
+      },
+    },
   ]
 }

@@ -11,6 +11,8 @@ import type { PlanRowInput, AddPlanResult, PiecePatch, ThemePatch } from '@/acti
 export type { PlanRowInput, AddPlanResult, PiecePatch, ThemePatch }
 
 export interface ContentApi extends SheetApi {
+  /** Owner, 26 Nov 2026: a task's tags, set from the sheet's Tags column. */
+  setTags?(taskId: string, tagIds: string[]): Promise<Result>
   addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus: boolean; target?: { projectId: string; pillarId?: string | null } | null }): Promise<AddPlanResult>
   addPiece(themeId: string, input: { title: string; pillarId?: string | null }): Promise<Result & { id?: string }>
   updatePiece(taskId: string, patch: PiecePatch): Promise<Result>

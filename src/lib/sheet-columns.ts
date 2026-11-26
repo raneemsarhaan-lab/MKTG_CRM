@@ -53,6 +53,8 @@ export const BUILT_INS: Record<'content' | 'video', BuiltInColumn[]> = {
     { key: 'due', width: 120, en: 'Due date', hidden: true },
     { key: 'priority', width: 100, en: 'Priority', hidden: true },
     { key: 'start', width: 120, en: 'Start date', hidden: true },
+    // Owner, 26 Nov 2026: Tags show and are set here too.
+    { key: 'tags', width: 160, en: 'Tags', hidden: true },
   ],
   // The redesigned Video sheet (design/video-sheet-v4.html) shows its own set,
   // 'sheet': Clip, Type, Stage, Owner, Reviewer, Due, In stage, File, the
@@ -105,6 +107,10 @@ export const TASK_BUILT_INS: BuiltInColumn[] = [
   { key: 'platform', width: 110, en: 'Platform', hidden: true },
   // Fields (25 Nov 2026): Owner is a standard field.
   { key: 'owner', width: 140, en: 'Owner', hidden: true },
+  // Owner, 26 Nov 2026: every field can be shown and edited here.
+  { key: 'tags', width: 160, en: 'Tags', hidden: true },
+  { key: 'theme', width: 160, en: 'Theme', hidden: true },
+  { key: 'pillar', width: 140, en: 'Pillar', hidden: true },
 ]
 export const TASK_SHEET = /^tasks:(space|brand|me):[0-9a-f-]{36}$/
 export const isTaskSheet = (sheet: string) => TASK_SHEET.test(sheet)

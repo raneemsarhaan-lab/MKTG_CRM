@@ -713,7 +713,8 @@
       "pillar": "Pillar",
       "date": "Publishing date",
       "archive": "Archive or restore",
-      "media": "Link task"
+      "media": "Link task",
+      "tags": "Tags"
     },
     "theme": {
       "pieces": "{count, plural, one {# piece} other {# pieces}}",
@@ -1011,7 +1012,8 @@
     "spaceTitle": "{space} plan",
     "noTheme": "No theme",
     "brandSet": "Brand set to {name}",
-    "noBrand": "No brand"
+    "noBrand": "No brand",
+    "noTags": "No tags yet: add them in Settings › Task types › Tags"
   },
   "inbox": {
     "button": {
@@ -3625,7 +3627,9 @@
       "media": "Link task",
       "tags": "Tags",
       "start": "Start date",
-      "space": "Space"
+      "space": "Space",
+      "theme": "Theme",
+      "pillar": "Pillar"
     },
     "simple": {
       "s-todo": "To Do",
@@ -3660,7 +3664,10 @@
     "rowsHelp": "Every task this page shows is a row. Change which tasks with the page's filters or a saved view.",
     "groupDefault": "This page's groups",
     "unknownStageList": "“{text}” isn't a status here. Try: {list}.",
-    "spaceReadOnly": "Shows in is changed in the task panel."
+    "spaceReadOnly": "Shows in is changed in the task panel.",
+    "unknownTag": "No tag is called “{text}”.",
+    "unknownTheme": "No theme is called “{text}”.",
+    "unknownPillar": "“{text}” isn’t a pillar of {theme}."
   },
   "dates": {
     "publish": "Publishing date",

@@ -6,6 +6,8 @@
  * pillars group pieces; every row is a task, moved by the board's own rules.
  * Paste plan brings the Content Library Google Sheet in.
  */
+import type { Priority } from '@/types/index'
+import { PRIORITIES, priorityColor } from '@/lib/priorities'
 import { useCardFields } from '@/components/fields/CardFields'
 import { latinDigits } from '@/lib/task-fields'
 import { useAddLabel } from '@/components/spaces/addLabel'
@@ -133,6 +135,9 @@ export function ContentSheet(p: ContentSheetProps) {
   const canEdit = useCallback((task: Task) => task.task_owner_id === me.id || task.assignee_id === me.id || !!task.assignee_ids?.includes(me.id) || admin, [me.id, admin])
   // QA 26 Nov 2026 (QF-11): pasted types are checked against the real task types.
   const planTypes = useCardFields()?.types
+  const sheetTags = useCardFields()?.tags
+  const tFieldsCol = useTranslations('content.col')
+  const tPriority = useTranslations('priority')
   const ctx = useMemo(() => ({ tasks: p.tasks, themes: p.themes, members: p.members, me, types: planTypes }), [p.tasks, p.themes, p.members, me, planTypes])
   const mayAdd = (theme: ContentTheme) => mayAddTo(theme, ctx)
   const mayEditTheme = (theme: ContentTheme) => admin || theme.owner_id === me.id
@@ -514,6 +519,31 @@ export function ContentSheet(p: ContentSheetProps) {
           closePopup(true)
           void p.api.update(task.id, { assignee_id: id }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
         }))
+      // Owner, 26 Nov 2026: Owner, Priority and Tags are set from the sheet too.
+      case 'owner':
+        if (!can) { onNote(`${row.key}|owner`, t('readOnly')); return }
+        return menu(tFieldsCol('owner'), editorMenuItems(p.members, task.task_owner_id, ts, id => {
+          closePopup(true)
+          if (!id) return
+          void p.api.update(task.id, { task_owner_id: id }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
+        }).filter(it => it.key !== ''))
+      case 'priority': {
+        if (!can) { onNote(`${row.key}|priority`, t('readOnly')); return }
+        const set = (pr: Priority) => () => { closePopup(true); void p.api.update(task.id, { priority: pr }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) }) }
+        return menu(tFieldsCol('priority'), PRIORITIES.map(pr => ({ key: pr, text: tPriority(pr), label: <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><span aria-hidden="true" style={{ color: priorityColor(pr) }}>⚑</span>{tPriority(pr)}</span>, tone: pr === task.priority ? ('next' as const) : undefined, onSelect: set(pr) })))
+      }
+      case 'tags': {
+        if (!can || !p.api.setTags) { onNote(`${row.key}|tags`, t('readOnly')); return }
+        const have = task.tag_ids ?? []
+        const flip = (id: string) => () => {
+          closePopup(true)
+          const next = have.includes(id) ? have.filter(x => x !== id) : [...have, id]
+          void p.api.setTags!(task.id, next).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
+        }
+        const all = sheetTags ?? []
+        if (!all.length) { onNote(`${row.key}|tags`, t('noTags')); return }
+        return menu(tFieldsCol('tags'), all.map(tg => ({ key: tg.id, text: tg.name, label: <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><span aria-hidden="true">{have.includes(tg.id) ? '☑' : '☐'}</span><span className="fx-content-type is-soft" style={{ ['--type-c' as string]: tg.color ?? '#6B7280' }}>{tg.name}</span></span>, onSelect: flip(tg.id) })))
+      }
       case 'brand': {
         // Owner, 26 Nov 2026: a task's brand is set from the sheet too (it was shown only).
         if (isClip || !p.brands?.length) return
@@ -633,6 +663,13 @@ export function ContentSheet(p: ContentSheetProps) {
       const d = readDate(value)
       if (d === null) return t('date.badDate')
       const r = await p.api.updatePiece(task.id, { publish_date: d || null })
+      return r.success ? null : why(r.error)
+    }
+    // Owner, 26 Nov 2026: Due and Start dates are typed in the sheet too (a typed due date is set by hand).
+    if (col === 'due' || col === 'start') {
+      const d = readDate(value)
+      if (d === null) return t('date.badDate')
+      const r = await p.api.update(task.id, col === 'due' ? { due_date: d || null } : { start_date: d || null })
       return r.success ? null : why(r.error)
     }
     return null
