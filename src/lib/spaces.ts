@@ -169,12 +169,28 @@ export function membersBySpace(rows: { space_id: string; member_id: string }[]):
   return out
 }
 
-/** Job role → starting Space keys (research R3). */
+/**
+ * Job role → starting Space keys (research R3). QA 25 Nov 2026 (F01): production's own titles are
+ * listed too ("Team Member", "Market Researcher"…); before, only one person matched and everyone else
+ * lost every Space at release.
+ */
 export const ROLE_SPACES: Record<string, string[]> = {
   'Video Editor': ['video'],
   'Graphic Designer': ['design'],
   'Content Creator': ['content', 'planning'],
   'Digital Marketing Specialist': ['content', 'planning'],
+  'Team Member': ['content', 'planning'],
+  'Market Researcher': ['content', 'planning'],
+  'Brand Director': ['content', 'planning'],
+  'Community Manager': ['content', 'planning'],
+  'Marketing Manager': ['content', 'planning'],
+  'Managing Director': ['content', 'planning'],
+}
+
+/** Spaces a member starts in: their title's, else Content and Planning (nobody starts with none). */
+export const DEFAULT_SPACES = ['content', 'planning']
+export function startingSpacesFor(role: string | null | undefined): string[] {
+  return ROLE_SPACES[(role ?? '').trim()] ?? DEFAULT_SPACES
 }
 
 export const VIA_ORDER: TaskSpaceVia[] = ['created', 'migration', 'assignee', 'handoff', 'manual']

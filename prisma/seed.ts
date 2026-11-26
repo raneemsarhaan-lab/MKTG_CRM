@@ -570,6 +570,21 @@ async function main() {
     return `${r.converted} are tasks now (${r.clips} of them clips)${r.boardsAdded ? `; ${r.boardsAdded} put on their parent's boards` : ''}${r.themed ? `; ${r.themed} took a theme (their parent's or their sheet row's)` : ''}${r.rowsFreed ? `; ${r.rowsFreed} sheet rows out from under their parent` : ''}; ${r.linksKept} keep their old parent as a Task link`
   })
 
+  // QA 25 Nov 2026 (F01): every member who isn't an admin belongs to a Space. The first Spaces step knew
+  // only four job titles, so on production one person got a Space and everyone else saw "404".
+  await once('space-members-v2', 'gave every member without a Space the Spaces of their title', async () => {
+    const { giveMissingSpaces } = await import('../src/lib/space-members')
+    const r = await giveMissingSpaces(prisma)
+    return `${r.members} members, ${r.rows} memberships added`
+  })
+  {
+    // The release check: list anyone still without a Space (an admin adds them in Space settings).
+    const { membersWithoutSpace } = await import('../src/lib/space-members')
+    const left = await membersWithoutSpace(prisma)
+    if (left.length) console.log(`  ⚠ ${left.length} member(s) have no Space and will see none: ${left.map(m => `${m.name} (${m.role})`).join(', ')}`)
+    else console.log('  ✓ every member who isn\'t an admin has at least one Space')
+  }
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

@@ -97,6 +97,8 @@ one  "pillars"               "select count(*) from content_pillars"
 
 # ── Spaces, hours, people, followers ──
 one  "team_spaces"           "select count(*) from team_spaces"
+# QA 25 Nov 2026 (F01): people who aren't admins and belong to no Space see none of them. Must be 0.
+one  "members.without_space"  "select count(*) from members m where m.access <> 'admin' and not exists (select 1 from team_space_members t where t.member_id = m.id)"
 one  "space_stages"          "select count(*) from space_stages"
 one  "task_spaces"           "select count(*) from task_spaces"
 one  "hours.work_days"       "select count(*) from work_days"

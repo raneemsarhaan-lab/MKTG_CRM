@@ -1,5 +1,6 @@
 'use server'
 
+import { startingSpacesFor } from '@/lib/spaces'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/authz'
@@ -89,7 +90,7 @@ export async function addMember(
     const name  = input.name.trim()
     const email = input.email.trim().toLowerCase()
 
-    await prisma.member.create({
+    const created = await prisma.member.create({
       data: {
         name, email,
         role:            input.role.trim() || 'Team Member',
@@ -98,7 +99,15 @@ export async function addMember(
         status:          'Available',
         password_hash,
       },
+      select: { id: true, role: true, access: true },
     })
+    // QA 25 Nov 2026 (F01): a new member starts in the Spaces of their title (else Content and Planning),
+    // so they never open the app to "404" everywhere. Admins see every Space anyway.
+    if (created.access !== 'admin') {
+      const keys = startingSpacesFor(created.role)
+      const spaces = await prisma.teamSpace.findMany({ where: { key: { in: keys }, archived_at: null }, select: { id: true } })
+      if (spaces.length) await prisma.teamSpaceMember.createMany({ data: spaces.map(sp => ({ space_id: sp.id, member_id: created.id })), skipDuplicates: true })
+    }
 
     // Adding someone back overrules an earlier removal — otherwise the
     // importers would keep skipping them and the account could never be
