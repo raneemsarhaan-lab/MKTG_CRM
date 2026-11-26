@@ -43,14 +43,29 @@ export function holdsStage(
   return meta.owner_role ? meta.owner_role === member.role : mine
 }
 
-/** Every stage the member may move this task to, in path order; [] when none. */
+/** An approval stage: a review stage held by a reviewer's role (C-Review, C-Check, D-Check, F-Check). */
+export function isApprovalStage(stage: StageId): boolean {
+  return !!STAGE_META[stage]?.owner_role
+}
+
+/**
+ * Every stage the member may move this task to, in path order; [] when none.
+ *
+ * QA 26 Nov 2026 (owner, F06): admins and superusers may move to any stage, approvals included. Anyone
+ * else who holds the stage may move it back, or forward up to and including the next approval stage,
+ * never past an approval. An admin or superuser may also move a task whose stage isn't on its path
+ * (a repair).
+ */
 export function allowedStages(task: MoveTask, member: MoveMember): StageId[] {
   if (task.dropped_at) return []
   const override = member.access === 'admin' || member.access === 'superuser'
-  if (!override && !holdsStage(task, member)) return []
   const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
-  if (!path.includes(task.status as StageId)) return []
-  return path.filter(s => s !== task.status)
+  const at = path.indexOf(task.status as StageId)
+  if (override) return path.filter(s => s !== task.status)
+  if (at === -1 || !holdsStage(task, member)) return []
+  const forward: StageId[] = []
+  for (const s of path.slice(at + 1)) { forward.push(s); if (isApprovalStage(s)) break }
+  return [...path.slice(0, at), ...forward]
 }
 
 /**

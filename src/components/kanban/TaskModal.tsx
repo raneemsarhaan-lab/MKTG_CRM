@@ -1,5 +1,6 @@
 'use client'
 
+import { allowedStages } from '@/lib/stage-moves'
 import { fieldOnIn } from '@/lib/field-catalog'
 import { PANEL_SECTIONS } from '@/lib/space-settings'
 import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
@@ -823,6 +824,8 @@ export function TaskModal({
     : stageMeta.owner_role === currentUser.role
 
   const canAdvance = !isPublished && nextStage !== null && (isOwnStage || isAdmin || isSuperuser)
+  // QA 26 Nov 2026 (F06): the same rule the server applies (src/lib/stage-moves.ts).
+  const movable = new Set(allowedStages({ ...task, assignee_ids: task.assignee_ids ?? null } as never, currentUser))
   const isOverride = canAdvance && !isOwnStage && (isAdmin || isSuperuser)
 
   // Escape closes the panel — unless something smaller is open, which takes it
@@ -1141,7 +1144,8 @@ export function TaskModal({
       if (!r.success) {
         flagRequired(r)
         setError(r.error === 'not_authorized'
-          ? 'That stage belongs to someone else — ask an admin to move it.'
+          ? (movable.size ? 'Only an admin or superuser can skip an approval stage.' : 'That stage belongs to someone else — ask an admin to move it.')
+          : r.error === 'stage_not_in_pipeline' ? 'This task’s stage isn’t on its pipeline — an admin can move it to a valid stage.'
           : moveErr(r) ?? errorText(r.error, 'Could not move the task — check your connection and try again.'))
         return
       }
@@ -2027,27 +2031,33 @@ export function TaskModal({
                           const meta = STAGE_META[id]
                           const here = id === task.status
                           const back = i < pipeline.indexOf(task.status as typeof id)
+                          // QA 26 Nov 2026 (F06): the stages you can't reach are greyed, with the reason —
+                          // only admins and superusers may skip an approval.
+                          const blocked = !here && !movable.has(id)
                           return (
                             <button
                               key={id}
                               type="button"
                               role="option"
                               aria-selected={here}
-                              onClick={() => handleSetStage(id)}
+                              aria-disabled={blocked || undefined}
+                              data-stage-blocked={blocked ? '' : undefined}
+                              onClick={() => { if (!blocked) handleSetStage(id) }}
                               style={{
                                 display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                                 padding: '8px 10px', border: 'none', borderRadius: 8,
-                                cursor: here ? 'default' : 'pointer', textAlign: 'start',
+                                cursor: here || blocked ? 'default' : 'pointer', textAlign: 'start',
                                 background: here ? CU.hover : 'transparent',
-                                fontFamily: 'inherit', fontSize: 14, color: CU.text,
+                                fontFamily: 'inherit', fontSize: 14, color: blocked ? CU.faint : CU.text,
                               }}
-                              onMouseEnter={e => { if (!here) e.currentTarget.style.background = CU.hover }}
-                              onMouseLeave={e => { if (!here) e.currentTarget.style.background = 'transparent' }}
+                              onMouseEnter={e => { if (!here && !blocked) e.currentTarget.style.background = CU.hover }}
+                              onMouseLeave={e => { if (!here && !blocked) e.currentTarget.style.background = 'transparent' }}
                             >
-                              <span style={{ width: 9, height: 9, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
+                              <span style={{ width: 9, height: 9, borderRadius: '50%', background: meta.color, flexShrink: 0, opacity: blocked ? 0.45 : 1 }} />
                               <span style={{ flex: 1, minWidth: 0 }}>{nameOf(id)}</span>
                               {here && <span style={{ fontSize: 12, color: CU.faint }}>now</span>}
-                              {!here && back && <span style={{ fontSize: 12, color: CU.faint }}>back</span>}
+                              {!here && back && !blocked && <span style={{ fontSize: 12, color: CU.faint }}>back</span>}
+                              {blocked && <span style={{ fontSize: 12, color: CU.faint }}>{movable.size ? 'after approval' : 'not yours'}</span>}
                             </button>
                           )
                         })}
