@@ -169,16 +169,13 @@ module.exports.views = (EMAIL, psql, ok) => [
       await page.click('[data-new-view-create]')
       await page.waitForSelector('[data-view-config]')
       ok(psql(`select count(*) from saved_views where node='space:${design}' and name='Lab sheet' and owner_id is not null and type='sheet'`) === '1', 'a personal view is saved')
-      await page.click('[data-fields-button]')
-      await page.uncheck('[data-fields-menu] [data-view-field="platform"]')
-      await page.keyboard.press('Escape')
-      await page.click('[data-view-save]')
-      await page.waitForTimeout(1200)
-      ok(/"platform"/.test(psql(`select config::text from saved_views where name='Lab sheet'`)) === false, 'fields saved without Platform')
+      // Spec 027 / simple header (25–26 Nov 2026): a saved Sheet view is the new sheet; its columns are the
+      // sheet's own (per person), so the view keeps its name, owner and type and opens straight on reload.
       const id = psql(`select id from saved_views where name='Lab sheet'`)
       await go(`/spaces/design?view=v:${id}`)
-      await page.waitForSelector(`[data-saved-view="${id}"] [data-task-sheet]`)
-      ok(!(await page.$('[data-task-sheet] [data-cell$="|platform"]')), 'reloading opens the view with its fields')
+      await page.waitForSelector('[data-workbook]', { timeout: 60000 })
+      ok(await page.getAttribute(`[data-view-tab="v:${id}"]`, 'aria-pressed') === 'true', 'reloading opens the saved Sheet view')
+      ok(!!(await page.$('[data-sheet-bar]')), 'with the sheet toolbar')
       ok(await page.$('[data-new-view-type]') === null, 'the + View form is closed')
     },
   },
