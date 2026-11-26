@@ -22,17 +22,18 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
-      id: '027-us1-board-cards-list-never-opens-the-sheet', as: 'admin',
+      // Owner, 26 Nov 2026: no Cards | List pair on any view; the board always shows its cards.
+      id: '027-us1-no-cards-list-pair', as: 'admin',
       async run({ page, go }) {
+        for (const url of ['/spaces/content?view=board', '/me?view=board']) {
+          await go(url)
+          await page.waitForSelector('.fx-board-cols', { timeout: 30000 })
+          ok(!(await page.$('[data-view-pair], [data-layout]')), `no Cards | List buttons on ${url}`)
+        }
+        await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('momentum.board.layout.')) localStorage.setItem(k, 'list') })
         await go('/spaces/content?view=board')
-        await page.waitForSelector('[data-layout="list"]', { timeout: 30000 })
-        await page.click('[data-layout="list"]')
-        await page.waitForSelector('[data-board-list]', { timeout: 10000 })
-        ok(!(await page.$('[data-workbook]')), 'List shows the board as a list, not the sheet')
-        ok(await page.getAttribute('[data-view-tab="board"]', 'aria-pressed') === 'true', 'still on the Board view')
-        await page.click('[data-layout="cards"]')
-        await page.waitForSelector('.fx-board-cols', { timeout: 10000 })
-        ok(!(await page.$('[data-board-list]')), 'Cards shows the columns again')
+        await page.waitForSelector('.fx-board-cols', { timeout: 30000 })
+        ok(!(await page.$('[data-board-list]')), 'a List picked before still opens as cards')
       },
     },
     {

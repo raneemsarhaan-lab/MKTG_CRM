@@ -305,9 +305,9 @@ function KanbanBoardInner({
     searchParams.get('view') === 'sheet' ? 'sheet' : 'board')
   // Spec 027 (US1): a Space page's Board shows its cards or a compact list of the same tasks (remembered here).
   const layoutKey = `momentum.board.layout.${boardKey ?? spaceId ?? 'board'}`
-  const [boardLayout, setBoardLayout] = useState<'cards' | 'list'>('cards')
-  useEffect(() => { try { if (window.localStorage.getItem(layoutKey) === 'list') setBoardLayout('list') } catch { /* private mode */ } }, [layoutKey])
-  const chooseLayout = (l: 'cards' | 'list') => { setBoardLayout(l); try { window.localStorage.setItem(layoutKey, l) } catch { /* private mode */ } }
+  // Owner, 26 Nov 2026: the Cards | List pair is gone, so a board always shows its cards (a List view is added from + View).
+  const boardLayout = 'cards' as 'cards' | 'list'
+  const chooseLayout = (l: 'cards' | 'list') => { void l; void layoutKey }
   // Inside a Sheets folder, "Board" leaves for the board itself.
   const setView = (v: BoardView) => { if (embedded && v === 'board') router.push('/board'); else setViewState(v) }
   useEffect(() => { if (view !== 'content') setLastPipelineView(view) }, [view])

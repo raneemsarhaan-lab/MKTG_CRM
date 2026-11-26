@@ -13,10 +13,9 @@ import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import type { Brand } from '@/types/index'
 import { BrandMenu } from './BrandMenu'
-import { ViewPair } from './ViewPair'
 import { SheetBarMine } from '@/components/views/SheetBarControls'
 
-export function BoardToolbar({ me, scope, onScope, brands, brandIds, onBrandIds, noProject, filters, sort, view, onView, display, hideBrands = false, noViewPair = false, layoutToggle }: {
+export function BoardToolbar({ me, scope, onScope, brands, brandIds, onBrandIds, noProject, filters, sort, display, hideBrands = false, noViewPair = false }: {
   /** QA 26 Nov 2026 (F12): who "Mine" is — the avatar button replaces Mine / Everyone. */
   me?: { name: string; color?: string; avatar_url?: string }
   /** Spec 025: the page has its own brand filter (a Space) or is one brand (a folder, a brand page). */
@@ -63,11 +62,8 @@ export function BoardToolbar({ me, scope, onScope, brands, brandIds, onBrandIds,
         </span>
       )}
       <div className="fx-hd-end">
-        {!noViewPair && <>
-          <ViewPair view={view} onView={onView} layout={layoutToggle} />
-          <span className="fx-hd-vr" aria-hidden="true" />
-          {display}
-        </>}
+        {/* Owner, 26 Nov 2026: no Cards | List (or Board | Sheet) pair on any view — the view tabs switch views. */}
+        {!noViewPair && display}
       </div>
     </div>
   )

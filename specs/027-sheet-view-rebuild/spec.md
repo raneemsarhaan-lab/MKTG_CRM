@@ -286,3 +286,4 @@ Decisions from the owner's answers to the QA review (fixes F01–F31). They repl
 - **FR-QA-15** (F31) Checks: `npm run lab:qa` (pure rules) and `scripts/spaces-lab/realapp/scenarios-qa.cjs` (in the app).
 
 - Not changed yet: F22 (the "Videos · No brand" theme's name) waits for the owner. F24 (a hydration warning) could not be reproduced in 6 fresh loads.
+- **FR-QA-16** (owner, 26 Nov 2026) No Cards | List (or Board | Sheet) buttons on any view: the view tabs switch views, and a board always shows its cards. A compact list is a List view added from + View.
