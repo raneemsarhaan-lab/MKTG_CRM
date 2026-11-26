@@ -10,6 +10,7 @@
  * apply on screen, push on the stack, queue for the server (R5, R6). The
  * linked tab is the board's own sheet, passed in by the page.
  */
+import { useSaveQueue } from '@/lib/save-queue'
 import { applyCommentOps } from '@/actions/sheet-comments'
 import { COMMENT_RECORD, reloadComments } from './format/bus'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -887,10 +888,12 @@ export function Workbook(p: WorkbookProps) {
   const readOnly = open?.protectedBy && open.protectedBy !== p.me.id && !p.me.admin
     ? t('protect.blocked', { name: p.names[open.protectedBy] ?? '…' })
     : null
-  const status = outbox.status
+  // QA 26 Nov 2026 (F07): task rows' edits too — kept while offline, never "Saved" before the server has them.
+  const queue = useSaveQueue()
+  const status = queue.waiting ? 'retrying' : queue.sending && outbox.status === 'saved' ? 'saving' : outbox.status
   // Spec 021: a brand's or a Space's workbook isn't "linked" as a folder; only its Tasks tab is.
   const linkedFolder = folder.kind === 'content' || folder.kind === 'video'
-  const statusText = status === 'retrying' ? t('status.retrying', { n: outbox.pending }) : status === 'saving' ? t('status.saving') : t('status.saved')
+  const statusText = queue.waiting ? t('status.offlineQueue', { n: queue.waiting }) : status === 'retrying' ? t('status.retrying', { n: outbox.pending }) : status === 'saving' ? t('status.saving') : t('status.saved')
   const dialogSheet = (id: string) => sheets.find(s => s.id === id)
 
   // Spec 019: ⚙ Fields on team sheets and (stage 2) the Content sheet.

@@ -32,6 +32,8 @@ const HEADINGS: Record<string, PlanColumn> = {
   workingdoc: 'doc', doc: 'doc', document: 'doc', designlink: 'design', design: 'design',
   tasklink: 'task', task: 'task', linkedinlink: 'post', linkedin: 'post', postlink: 'post', post: 'post',
   publishedlink: 'published', published: 'published', publishlink: 'published',
+  // QA 26 Nov 2026 (F23): a date column is the row's publishing date.
+  date: 'date' as PlanColumn, publishingdate: 'date' as PlanColumn, publishdate: 'date' as PlanColumn, publishing: 'date' as PlanColumn,
 }
 const PLAN_COLUMNS = new Set<string>(DEFAULT_ORDER)
 
@@ -91,6 +93,8 @@ export type ProblemCode =
 export interface PlanRow {
   /** 1-based, in paste order. */
   index: number
+  /** QA 26 Nov 2026 (F23): the publishing date read from a date column (YYYY-MM-DD), or null. */
+  date?: string | null
   theme: string
   owner: string
   frequency: { count: number; period: FrequencyPeriod } | null
@@ -124,9 +128,11 @@ export interface ReadPlan {
  */
 export function readPlan(cells: PastedCell[][], targets: PasteTarget[] = []): ReadPlan {
   const headAt = cells.findIndex(r => r.some(c => headingOf(c.text, targets) === 'title'))
+  // QA 26 Nov 2026 (F23): no heading row → the first column is the title, and the others are read by what
+  // they hold (dates, types, stages); anything else stays out.
   const cols: (string | null)[] = headAt >= 0
     ? cells[headAt].map(c => headingOf(c.text, targets))
-    : DEFAULT_ORDER
+    : guessColumns(cells)
   const unknown: string[] = []
   if (headAt >= 0) {
     for (const c of cells[headAt]) {
@@ -177,7 +183,7 @@ export function readPlan(cells: PastedCell[][], targets: PasteTarget[] = []): Re
       index: rows.length + 1,
       theme: carry.theme, owner: carry.owner,
       frequency: readFrequency(carry.frequency), audience: readAudience(carry.audience),
-      pillar: carry.pillar, title, type: readType(text('type')), status, statusText,
+      pillar: carry.pillar, title, type: readType(text('type')), status, statusText, date: readDay(text('date')),
       links, badLinks, taskId: taskIdFromLink(taskCell?.href ?? taskCell?.text), custom, problems,
     })
   }
@@ -268,4 +274,42 @@ export function classifyPlan(rows: PlanRow[], ctx: PlanContext): Classified[] {
     if (blocking.length && kind !== 'existing') kind = 'problem'
     return { ...r, problems, kind, themeIsNew, otherTheme, ownerId, values }
   })
+}
+
+const MONTHS: Record<string, number> = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 }
+const pad = (n: number) => String(n).padStart(2, '0')
+const valid = (y: number, m: number, d: number) => m >= 1 && m <= 12 && d >= 1 && d <= 31 && !Number.isNaN(Date.parse(`${y}-${pad(m)}-${pad(d)}T00:00:00Z`)) && new Date(`${y}-${pad(m)}-${pad(d)}T00:00:00Z`).getUTCDate() === d
+
+/**
+ * QA 26 Nov 2026 (F23): a pasted date as YYYY-MM-DD, or null. Day first, as in Egypt: 2026-11-24, 24/11/2026,
+ * 24/11/26, 24/11 (this year), 24-Nov-26, 24 Nov 2026, Nov 24 2026.
+ */
+export function readDay(text: string, year = new Date().getUTCFullYear()): string | null {
+  const s = text.trim().toLowerCase().replace(/,/g, ' ').replace(/\s+/g, ' ')
+  if (!s) return null
+  const full = (y: number) => (y < 100 ? 2000 + y : y)
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s)
+  if (m) { const y = +m[1], mo = +m[2], d = +m[3]; return valid(y, mo, d) ? `${y}-${pad(mo)}-${pad(d)}` : null }
+  m = /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?$/.exec(s)
+  if (m) { const d = +m[1], mo = +m[2], y = m[3] ? full(+m[3]) : year; return valid(y, mo, d) ? `${y}-${pad(mo)}-${pad(d)}` : null }
+  m = /^(\d{1,2})[ -]([a-z]{3,9})\.?(?:[ -](\d{2,4}))?$/.exec(s)
+  if (m && (MONTHS[m[2].slice(0, 4)] ?? MONTHS[m[2].slice(0, 3)])) { const mo = MONTHS[m[2].slice(0, 4)] ?? MONTHS[m[2].slice(0, 3)], d = +m[1], y = m[3] ? full(+m[3]) : year; return valid(y, mo, d) ? `${y}-${pad(mo)}-${pad(d)}` : null }
+  m = /^([a-z]{3,9})\.? (\d{1,2})(?: (\d{2,4}))?$/.exec(s)
+  if (m && (MONTHS[m[1].slice(0, 4)] ?? MONTHS[m[1].slice(0, 3)])) { const mo = MONTHS[m[1].slice(0, 4)] ?? MONTHS[m[1].slice(0, 3)], d = +m[2], y = m[3] ? full(+m[3]) : year; return valid(y, mo, d) ? `${y}-${pad(mo)}-${pad(d)}` : null }
+  return null
+}
+
+/** Columns of a paste with no heading row: the first is the title; a column of dates, types or stages is read as such. */
+function guessColumns(cells: PastedCell[][]): (string | null)[] {
+  const width = Math.max(0, ...cells.map(r => r.length))
+  const cols: (string | null)[] = ['title']
+  const used = new Set<string>(['title'])
+  for (let j = 1; j < width; j++) {
+    const vals = cells.map(r => (r[j]?.text ?? '').trim()).filter(Boolean)
+    const share = (f: (v: string) => unknown) => vals.length ? vals.filter(v => f(v)).length / vals.length : 0
+    const k = share(v => readDay(v)) >= 0.6 ? 'date' : share(v => readType(v)) >= 0.6 ? 'type' : share(v => readStatus(v)) >= 0.6 ? 'status' : null
+    cols.push(k && !used.has(k) ? k : null)
+    if (k) used.add(k)
+  }
+  return cols
 }

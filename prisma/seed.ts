@@ -567,7 +567,14 @@ async function main() {
   await once('subtasks-to-tasks-v1', 'turned subtasks and clips into tasks of their own', async () => {
     const { subtasksToTasks } = await import('../src/lib/subtasks-to-tasks')
     const r = await subtasksToTasks(prisma)
-    return `${r.converted} are tasks now (${r.clips} of them clips)${r.boardsAdded ? `; ${r.boardsAdded} put on their parent's boards` : ''}${r.themed ? `; ${r.themed} took a theme (their parent's or their sheet row's)` : ''}${r.rowsFreed ? `; ${r.rowsFreed} sheet rows out from under their parent` : ''}; ${r.linksKept} keep their old parent as a Task link`
+    return `${r.converted} are tasks now (${r.clips} of them clips)${r.boardsAdded ? `; ${r.boardsAdded} put on their parent's boards` : ''}${r.themed ? `; ${r.themed} took a theme (their parent's or their sheet row's)` : ''}${r.rowsFreed ? `; ${r.rowsFreed} sheet rows out from under their parent` : ''}; ${r.linksKept} old parents kept in the record subtasks-parents.csv`
+  })
+  // Owner, 26 Nov 2026: no parent tasks anywhere. Where the step above already ran with its Task link
+  // columns (staging), they come off every sheet; their values go to the record first, nothing is deleted.
+  await once('parent-columns-off-v1', 'took the old parent columns off the sheets', async () => {
+    const { hideParentColumns } = await import('../src/lib/subtasks-to-tasks')
+    const r = await hideParentColumns(prisma)
+    return `${r.columns} columns taken off, ${r.values} old parents kept in subtasks-parents.csv`
   })
 
   // QA 25 Nov 2026 (F01): every member who isn't an admin belongs to a Space. The first Spaces step knew

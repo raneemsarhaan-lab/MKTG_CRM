@@ -60,7 +60,7 @@ function toInput(r: Classified, move: boolean): PlanRowInput {
     audience: r.audience.join(', '),
     working_doc: r.links.doc ?? undefined, design: r.links.design ?? undefined,
     post: r.links.post ?? undefined, published: r.links.published ?? undefined,
-    task_link: r.taskId ?? undefined, move,
+    task_link: r.taskId ?? undefined, move, date: r.date ?? undefined,
     custom: Object.keys(r.values).length ? r.values : undefined,
   }
 }
@@ -100,7 +100,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const read = useMemo(() => {
     // Sheet 2b: a plain list (no headings) pasted on a theme, pillar or "+ Row" is a list of titles.
-    const plain = !!target && !cells.some(r => r.some(c => /^(title|task|piece|name)$/i.test(c.text.trim()))) && Math.max(0, ...cells.map(r => r.length)) <= 2
+    const plain = !!target && !cells.some(r => r.some(c => /^(title|task|piece|name)$/i.test(c.text.trim()))) && Math.max(0, ...cells.map(r => r.length)) <= 1
     const withHead = plain ? [[{ text: 'Title', href: null }, { text: '', href: null }] as PastedCell[], ...cells] : cells
     const r = readPlan(withHead, columns?.targets ?? [])
     if (!target) return r
@@ -364,12 +364,13 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
               <div className="fx-sheet-sect">{t(`paste.${label as string}`)}</div>
               <div className="fx-sheet-ptab-wrap">
                 <table className="fx-sheet-ptab" data-plan-section={label as string}>
-                  <thead><tr><th>{t('paste.piece')}</th><th>{t('paste.theme')}</th><th>{t('paste.type')}</th><th>{t('paste.status')}</th><th>{t('paste.owner')}</th><th>{t('paste.links')}</th><th /></tr></thead>
+                  <thead><tr><th>{t('paste.piece')}</th><th>{t('paste.theme')}</th><th>{t('paste.date')}</th><th>{t('paste.type')}</th><th>{t('paste.status')}</th><th>{t('paste.owner')}</th><th>{t('paste.links')}</th><th /></tr></thead>
                   <tbody>
                     {(list as Classified[]).slice(0, SHOWN_ROWS).map(r => (
                       <tr key={r.index} data-plan-row={r.index}>
                         <td>{r.title}</td>
                         <td>{r.pillar ? `${r.theme} · ${r.pillar}` : r.theme}</td>
+                        <td className="fx-cs-tnum" data-plan-date={r.date ?? ''}>{r.date ?? '—'}</td>
                         <td>{r.type ?? '—'}</td>
                         <td>{r.status ? (r.status.archived ? t('paste.archived') : t(`stage.${r.status.stage}`)) : ''}</td>
                         <td>{r.owner}{r.problems.some(p => p.code === 'unknownOwner') && <span className="fx-sheet-muted"> ({t('problem.unknownOwner', { name: r.owner })})</span>}</td>

@@ -70,6 +70,8 @@ export interface PlanRowInput {
   theme: string; owner?: string; frequency?: string; audience?: string; pillar?: string
   title: string; type?: string; status?: string
   working_doc?: string; design?: string; task_link?: string; post?: string; published?: string
+  /** QA 26 Nov 2026 (F23): the publishing date (YYYY-MM-DD) read from the paste. */
+  date?: string
   /** A matched task in another theme moves here only when this is true. */
   move?: boolean
   /** Custom column values by column id (spec 010); re-parsed here. */
@@ -268,7 +270,8 @@ export async function addPlan(rows: PlanRowInput[], opts: {
           const last = await tx.contentRow.findFirst({ where: { project_id: theme.id, space_id: sheetSpaceId }, orderBy: { position: 'desc' }, select: { position: true } })
           const values: Record<string, string> = {}
           for (const [colId, v] of Object.entries(r.custom ?? {})) { const c = columns.get(colId); if (c && typeof v === 'string' && v.trim()) values[(await tx.sheetColumn.findUnique({ where: { id: c.id }, select: { key: true } }))?.key ?? colId] = v.trim().slice(0, 5000) }
-          const made = await tx.contentRow.create({ data: { project_id: theme.id, space_id: sheetSpaceId, pillar_id: pillarId, title, position: (last?.position ?? 0) + 1, values, created_by: member.id } })
+          const day = r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? new Date(`${r.date}T00:00:00Z`) : null
+          const made = await tx.contentRow.create({ data: { project_id: theme.id, space_id: sheetSpaceId, pillar_id: pillarId, title, position: (last?.position ?? 0) + 1, values, created_by: member.id, date: day } })
           res.rowsCreated.push(made.id)
           continue
         }

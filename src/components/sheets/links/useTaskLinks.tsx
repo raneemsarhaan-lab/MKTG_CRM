@@ -120,7 +120,11 @@ export function useTaskLinks(p: {
     if (ambiguous[rowId]) return 'choose'
     const tk = taskOfRow(rowId)
     if (tk) return tk.dropped ? 'dropped' : null
-    return p.value(rowId, map.taskCol).trim() ? 'notLinked' : null
+    // QA 26 Nov 2026 (F29, owner): in a spreadsheet tab that uses the Link task column, every titled row
+    // without a task offers Make task — its title from the column matched to Title, else the Link task cell.
+    // The tab stays a spreadsheet: formatting and merged cells are untouched.
+    const titleCol = Object.entries(map.fields).find(([, f]) => f === 'title')?.[0]
+    return (titleCol && p.value(rowId, titleCol).trim()) || p.value(rowId, map.taskCol).trim() ? 'notLinked' : null
   }
 
   // ── saving ──

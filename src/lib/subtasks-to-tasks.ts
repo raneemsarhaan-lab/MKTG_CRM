@@ -8,8 +8,9 @@
  * (on no board of its own) is put on its parent's boards. One with no theme takes its parent's theme
  * and pillar, like any task, and its sheet row stops being a child row and sits in that theme.
  *
- * The old parent stays linked: a Task link column on the sheet of the task's Space ("Video" for a clip,
- * "Linked task" otherwise) holds it, so it shows and can be unlinked like any Task link.
+ * No parent link stays on the task (owner, 26 Nov 2026: "no parent tasks" — theme › pillar › task). The
+ * old parent is kept as a record only: the export "subtasks-parents.csv" lists each converted task and the
+ * task it used to sit under.
  */
 import { randomUUID } from 'node:crypto'
 import type { Prisma, PrismaClient } from '@prisma/client'
@@ -41,6 +42,8 @@ export async function subtasksToTasks(db: Db): Promise<{ converted: number; clip
     return id
   }
   let linksKept = 0
+  const parents: [string, string][] = []
+  void linkColumn; void spaceSheetId
   const isClip = (c: (typeof children)[number]) => !!c.clip || (c.parent?.content_type_label === 'Video' && !c.parent.parent_task_id)
   let converted = 0, clips = 0, boardsAdded = 0, themed = 0, rowsFreed = 0
   for (const c of children) {
@@ -66,17 +69,41 @@ export async function subtasksToTasks(db: Db): Promise<{ converted: number; clip
       await db.contentRow.update({ where: { id: r.id }, data: { parent_id: null, ...(project ? { project_id: project, pillar_id: pillar } : {}) } })
       rowsFreed++
     }
-    // The old parent stays linked, through a Task link on the sheet of the task's Space.
-    if (c.parent_task_id) {
-      const spaces = c.spaces.length ? c.spaces.map(x => x.space) : (await db.taskSpace.findMany({ where: { task_id: c.id }, select: { space: { select: { id: true, key: true } } } })).map(x => x.space)
-      const home = (isClip(c) ? spaces.find(x => x.key === 'video') : null) ?? spaces[0]
-      if (home) {
-        const col = await linkColumn(spaceSheetId(home), isClip(c) ? 'Video' : 'Linked task')
-        await db.sheetValue.upsert({ where: { column_id_task_id: { column_id: col, task_id: c.id } }, create: { column_id: col, task_id: c.id, value: c.parent_task_id }, update: {} })
-        linksKept++
-      }
-    }
+    // The old parent is kept as a record (subtasks-parents.csv), not as a link on the task.
+    if (c.parent_task_id) { parents.push([c.id, c.parent_task_id]); linksKept++ }
     converted++
   }
+  if (parents.length) await saveParentsRecord(db, parents)
   return { converted, clips, boardsAdded, themed, rowsFreed, linksKept }
+}
+
+const csv = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
+
+/** The record of each converted task and the task it used to sit under (added to, never replaced). */
+async function saveParentsRecord(db: Db, pairs: [string, string][]) {
+  const ids = [...new Set(pairs.flat())]
+  const names = new Map((await db.task.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })).map(t => [t.id, t.name]))
+  const old = await db.dataExport.findUnique({ where: { name: 'subtasks-parents.csv' } })
+  const lines = pairs.map(([t, p]) => [t, names.get(t) ?? '', p, names.get(p) ?? ''].map(csv).join(','))
+  const content = old ? `${old.content}\n${lines.join('\n')}` : ['task_id,task,old_parent_id,old_parent', ...lines].join('\n')
+  await db.dataExport.upsert({
+    where: { name: 'subtasks-parents.csv' },
+    create: { name: 'subtasks-parents.csv', title: 'Former subtasks and clips, and the task each sat under (25–26 Nov 2026)', content, rows: pairs.length },
+    update: { content, rows: (old?.rows ?? 0) + pairs.length },
+  })
+}
+
+/**
+ * Staging only (owner, 26 Nov 2026: no parent tasks): the "Video" and "Linked task" columns an earlier
+ * version of this step added are taken off every sheet. Their values are first added to the record
+ * (subtasks-parents.csv); the columns are marked removed, not deleted, so nothing is lost.
+ */
+export async function hideParentColumns(db: Db): Promise<{ columns: number; values: number }> {
+  const cols = await db.sheetColumn.findMany({ where: { kind: 'task', name: { in: ['Video', 'Linked task'] }, deleted_at: null, key: { startsWith: 'c:' }, created_at: { gte: new Date('2026-11-25T00:00:00Z') } }, select: { id: true } })
+  if (!cols.length) return { columns: 0, values: 0 }
+  const vals = await db.sheetValue.findMany({ where: { column_id: { in: cols.map(c => c.id) } }, select: { task_id: true, value: true } })
+  const pairs = vals.filter(v => v.value).map(v => [v.task_id, v.value] as [string, string])
+  if (pairs.length) await saveParentsRecord(db, pairs)
+  await db.sheetColumn.updateMany({ where: { id: { in: cols.map(c => c.id) } }, data: { deleted_at: new Date() } })
+  return { columns: cols.length, values: pairs.length }
 }

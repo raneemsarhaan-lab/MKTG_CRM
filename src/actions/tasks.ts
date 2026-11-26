@@ -253,6 +253,8 @@ export async function addComment(
  * Authorised like moveTask: the task's owner, or an admin/superuser.
  */
 export interface TaskPatch {
+  /** QA 26 Nov 2026 (F09): the values the editor started from; a field changed meanwhile by someone else is refused. */
+  base?: Partial<Record<'name' | 'content_type_label' | 'assignee_id' | 'description', string | null>>
   name?:               string
   description?:        string
   brand_id?:           string
@@ -288,6 +290,17 @@ export async function updateTask(
   const task = await withAssignees(found)
 
   if (!canAct(task, member)) return { success: false, error: 'not_authorized' }
+
+  // QA 26 Nov 2026 (F09): someone else changed this field since you started editing → refused, not overwritten.
+  if (patch.base) {
+    const now = found as unknown as Record<string, unknown>
+    const same = (a: unknown, b: unknown) => String(a ?? '').trim() === String(b ?? '').trim()
+    for (const [k, was] of Object.entries(patch.base)) {
+      if ((patch as Record<string, unknown>)[k] !== undefined && !same(now[k], was) && !same(now[k], (patch as Record<string, unknown>)[k])) {
+        return { success: false, error: 'changed_meanwhile' }
+      }
+    }
+  }
 
   // Build the update explicitly — never spread the caller's object into
   // Prisma, or an extra key like `status` would ride along.

@@ -48,6 +48,8 @@ export interface ContentApi extends SheetApi {
 export interface ContentSheetProps {
   /** Spec 027 (US2): the Board tab — the board's tasks after its own filter; every one is listed. */
   boardTasks?: import('@/types/index').Task[]
+  /** QA 26 Nov 2026 (F28): a Brand page's Board tab — themes belong to a Space, so none are added here. */
+  noThemeAdd?: boolean
   /** The Board's Mine or a filter is on: rows whose task it hides hide too. */
   boardFiltered?: boolean
   /** Spec 027 (US3): an added tab of this Sheet view (not the Board tab). */
@@ -88,4 +90,6 @@ export interface ContentSheetProps {
   spaces?: { id: string; key: string; name: string; color: string; media_board?: string | null }[]
   /** Which tasks show in which Space (Make task › an existing task there). */
   taskSpaces?: { task_id: string; space_id: string }[]
+  /** QA 26 Nov 2026 (F27): the Spaces Make task may create in (else every Space). */
+  makeSpaces?: { id: string; name: string }[]
 }

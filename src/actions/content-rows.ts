@@ -14,7 +14,6 @@
  *   Pillars: admins, superusers and the theme's owner add, reorder (the sheet
  *   only) and remove them; their rows go where the person says.
  */
-import { resolveSettings } from '@/lib/space-settings'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
@@ -27,7 +26,7 @@ import { dayDate, isDay } from '@/lib/due-dates'
 import { newTaskDates } from '@/lib/due-dates-server'
 import { AUDIENCE_KEYS, norm } from '@/lib/content-plan'
 import { mapContentRow } from '@/lib/mappers'
-import { between, childrenOf, groupRows, indentTarget, mayNest, positionFor, reorder, type ContentRowRec } from '@/lib/content-rows'
+import { between, groupRows, positionFor, reorder, type ContentRowRec } from '@/lib/content-rows'
 import { defaultAssigneeFor } from '@/lib/spaces'
 import { creationPlan, creationRefusal, homeSpaceOf, loadSpacesWithSettings } from '@/lib/space-settings-server'
 import { spaceSheetId } from '@/lib/sheet-columns'
@@ -108,12 +107,6 @@ async function taskFollows(taskIds: string[], projectId: string | null, pillarId
 
 // ─── Rows ───────────────────────────────────────────────────────────────────
 
-/** Spec 024 (§3): the Content Space's "Child rows allowed" switch. */
-async function childRowsOn(): Promise<boolean> {
-  const space = await prisma.teamSpace.findUnique({ where: { key: 'content' }, select: { key: true, settings: true } })
-  return !space || resolveSettings(space.key, space.settings).child_rows
-}
-
 export async function addRow(input: {
   /** The theme's project; none for an added tab's rows under no theme. */
   projectId: string | null; pillarId?: string | null; parentId?: string | null; title: string
@@ -134,18 +127,12 @@ export async function addRow(input: {
   // A row may sit under no theme (the tab's or Board tab's "No theme" group).
   if (projectId && !(await themeOf(projectId, sc))) return { success: false, error: 'not_a_theme' }
   const rows = await allRows(projectId, sc)
-  let pillar = await pillarIn(projectId, input.pillarId)
+  const pillar = await pillarIn(projectId, input.pillarId)
   if (pillar === false) return { success: false, error: 'not_a_theme' }
-  let parentId: string | null = null
-  if (input.parentId && !(await childRowsOn())) return { success: false, error: 'child_rows_off' }
-  if (input.parentId) {
-    const parent = rows.find(r => r.id === input.parentId)
-    if (!parent || parent.parent_id) return { success: false, error: 'one_level' }
-    if (!(await mayEditRow(parent, m))) return { success: false, error: 'not_authorized' }
-    parentId = parent.id
-    pillar = parent.pillar_id
-  }
-  const siblings = parentId ? childrenOf(rows, parentId) : groupRows(rows, projectId, pillar)
+  // QA 26 Nov 2026 (F18, owner): no child rows — theme › pillar › task. A row is never put under another.
+  const parentId: string | null = null
+  if (input.parentId) return { success: false, error: 'child_rows_off' }
+  const siblings = groupRows(rows, projectId, pillar)
   const row = await prisma.contentRow.create({
     data: {
       ...('sheetId' in sc ? { sheet_id: sc.sheetId, space_id: null } : { space_id: sc.spaceId }),
@@ -211,18 +198,11 @@ export async function moveRow(id: string, toIn: {
   if (to.projectId && !(await themeOf(to.projectId, sc))) return { success: false, error: 'not_a_theme' }
   const rows = await allRows(to.projectId, sc)
   const me0 = mapContentRow(row)
-  let pillar = await pillarIn(to.projectId, to.pillarId)
+  const pillar = await pillarIn(to.projectId, to.pillarId)
   if (pillar === false) return { success: false, error: 'not_a_theme' }
-  let parentId: string | null = null
-  if (to.parentId) {
-    const parent = rows.find(r => r.id === to.parentId)
-    const kids = await prisma.contentRow.count({ where: { parent_id: id } })
-    if (!parent || parent.parent_id || parent.id === id || kids > 0) return { success: false, error: 'one_level' }
-    if (!(await mayEditRow(parent, m))) return { success: false, error: 'not_authorized' }
-    parentId = parent.id
-    pillar = parent.pillar_id
-  }
-  const siblings = (parentId ? childrenOf(rows, parentId) : groupRows(rows, to.projectId, pillar)).filter(r => r.id !== id)
+  const parentId: string | null = null
+  // QA 26 Nov 2026 (F18): a moved row is never put under another row; a parentId asked for is ignored.
+  const siblings = groupRows(rows, to.projectId, pillar).filter(r => r.id !== id)
   const position = positionFor(siblings, to.anchor && to.anchor.id !== id ? to.anchor : null)
   await prisma.contentRow.update({ where: { id }, data: { project_id: to.projectId, pillar_id: pillar, parent_id: parentId, position } })
   const kids = await prisma.contentRow.findMany({ where: { parent_id: id } })
@@ -241,12 +221,8 @@ export async function indentRow(id: string, dir: 'in' | 'out'): Promise<{ succes
   if (!row) return { success: false, error: 'not_found' }
   const rows = await allRows(row.project_id, scopeOfRow(row))
   const rec = rows.find(r => r.id === id)!
-  if (dir === 'in') {
-    if (!(await childRowsOn())) return { success: false, error: 'child_rows_off' }
-    const target = indentTarget(rows, rec)
-    if (!target) return { success: false, error: 'one_level' }
-    return moveRow(id, { projectId: row.project_id, parentId: target.id })
-  }
+  // QA 26 Nov 2026 (F18): rows aren't nested any more; moving one out still works for older data.
+  if (dir === 'in') return { success: false, error: 'child_rows_off' }
   if (!rec.parent_id) return { success: false, error: 'not_a_child' }
   const parent = rows.find(r => r.id === rec.parent_id)
   return moveRow(id, { projectId: row.project_id, pillarId: parent?.pillar_id ?? null, anchor: parent ? { id: parent.id, where: 'below' } : null })
@@ -532,7 +508,13 @@ export async function addSheetTheme(input: {
   // A theme is a project behind the scenes. One with this name in this brand is the same project on
   // every Space's sheet (user, 24 Nov 2026), so a brand's work can be collected by project. Using an
   // existing project brings none of its tasks onto this sheet: a sheet holds the rows put on it.
-  const found = (await prisma.project.findMany({ where: { brand_id: brandId }, select: { id: true, name: true } })).find(p => norm(p.name) === norm(name))
+  // QA 26 Nov 2026 (F19): an existing theme of that name from any Space is the same theme — this brand's
+  // first, then one with no brand (or, on a Space's own sheet, any brand's). A campaign that isn't a theme
+  // is reused only within its own brand, as before.
+  const named = (await prisma.project.findMany({ where: { name: { equals: name, mode: 'insensitive' } }, select: { id: true, name: true, brand_id: true, is_theme: true } })).filter(p => norm(p.name) === norm(name))
+  const found = named.find(p => p.is_theme && p.brand_id === brandId)
+    ?? named.find(p => p.is_theme && (p.brand_id === null || brandId === null))
+    ?? named.find(p => p.brand_id === brandId)
   if (found && await prisma.contentSheetTheme.findFirst({ where: { project_id: found.id, ...inScope(sid) }, select: { id: true } })) return { success: false, error: 'theme_exists' }
   const projectId = found
     ? (await prisma.project.update({ where: { id: found.id }, data: { is_theme: true } })).id
@@ -677,9 +659,12 @@ export async function themeNames(spaceId?: string | null, brandId?: string | nul
   const m = await me()
   if (!m || !isAdmin(m)) return []
   const sid = await scopeFrom(spaceId, sheetId)
+  // QA 26 Nov 2026 (F19, owner): "+ Theme" offers the themes already used in any Space — on a Space's own
+  // sheet all of them, in a brand folder that brand's and those with no brand — that aren't on this sheet.
+  const brand = brandId && UUID.test(brandId) ? brandId : null
   const rows = await prisma.project.findMany({
-    where: { brand_id: brandId && UUID.test(brandId) ? brandId : null, sheet_themes: { none: inScope(sid) } },
+    where: { is_theme: true, sheet_themes: { none: inScope(sid) }, ...(brand ? { OR: [{ brand_id: brand }, { brand_id: null }] } : {}) },
     select: { name: true }, orderBy: { name: 'asc' },
   })
-  return rows.map(r => r.name)
+  return [...new Set(rows.map(r => r.name))]
 }

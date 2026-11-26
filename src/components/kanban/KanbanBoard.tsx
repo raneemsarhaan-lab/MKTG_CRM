@@ -1,5 +1,7 @@
 'use client'
 
+import { sendOrQueue } from '@/lib/save-queue'
+import { mayCreateIn } from '@/lib/space-settings'
 import { BrandGroupProvider } from '@/components/spaces/brandGroup'
 import { useMineScope } from '@/components/views/mine-scope'
 import { spaceSheetId } from '@/lib/sheet-columns'
@@ -715,9 +717,14 @@ function KanbanBoardInner({
         optimistic.assignee = members.find(m => m.id === patch.assignee_id)
       }
       patchTask(taskId, optimistic)
-      const res = await updateTask(taskId, patch).catch(() => ({ success: false, error: 'generic' }))
-      if (!res.success) patchTask(taskId, { name: before.name, content_type_label: before.content_type_label, assignee_id: before.assignee_id, assignee: before.assignee })
-      else router.refresh()
+      // QA 26 Nov 2026 (F07, F09): kept and sent again when offline; refused when someone changed it meanwhile.
+      const base: NonNullable<Parameters<typeof updateTask>[1]['base']> = {}
+      if (patch.name !== undefined) base.name = before.name
+      if (patch.content_type_label !== undefined) base.content_type_label = before.content_type_label ?? null
+      if (patch.assignee_id !== undefined) base.assignee_id = before.assignee_id ?? null
+      const res = await sendOrQueue(() => updateTask(taskId, { ...patch, base })).catch(() => ({ success: false, error: 'generic' }))
+      if (!res.success) { patchTask(taskId, { name: before.name, content_type_label: before.content_type_label, assignee_id: before.assignee_id, assignee: before.assignee }); if (res.error === 'changed_meanwhile') router.refresh() }
+      else if (!('queued' in res)) router.refresh()
       return res
     },
     async updateClip(taskId, patch) {
@@ -940,8 +947,9 @@ function KanbanBoardInner({
     ...(() => {
       const fail = { success: false as const, error: 'generic' }
       const run = <A extends unknown[], R extends { success: boolean }>(fn: (...a: A) => Promise<R>) => async (...a: A): Promise<R> => {
-        const res = await fn(...a).catch(() => fail as unknown as R)
-        if (res.success) router.refresh()
+        // QA 26 Nov 2026 (F07): an edit made offline is kept and sent when the connection is back.
+        const res = await sendOrQueue(() => fn(...a)).catch(() => fail as unknown as R) as R
+        if (res.success && !('queued' in (res as object))) router.refresh()
         return res
       }
       return {
@@ -1348,6 +1356,9 @@ function KanbanBoardInner({
   )
   // Spec 021: the creator's own pipeline Spaces, for "Show in" when not created from a Space.
   const mySpaces = spaces.filter(x => spaceMembers.some(r => r.space_id === x.id && r.member_id === currentUser.id))
+  // QA 26 Nov 2026 (F27): Make task's "In Space" lists only Spaces you may create in, named in your language.
+  const makeSpaces = spaces.filter(x => mayCreateIn(x.settings, currentUser, spaceMembers.filter(r => r.space_id === x.id).map(r => r.member_id)))
+    .map(x => ({ id: x.id, name: (boardLocale === 'ar' && (x.settings as { name_ar?: string | null } | null)?.name_ar) || x.name }))
   // Spec 024 (§3): in a Space, the form offers its allowed task types, the default first.
   const formSpace = spaceId ? spaces.find(x => x.id === spaceId) : undefined
   const taskForm = showTaskForm && (
@@ -1402,6 +1413,7 @@ function KanbanBoardInner({
         )}
         <ContentSheet
           boardTasks={boardTasks}
+          noThemeAdd={brandBoard && !tabSheet}
           boardFiltered={boardTab && (narrowed || scope === 'me' || activeFilterCount(filters) > 0)}
           stages={sheetSpace?.key === 'video' && !spaceId ? videoStages : contentStages}
           tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
@@ -1426,6 +1438,7 @@ function KanbanBoardInner({
           }}
           space={sheetSpace ?? null}
           spaces={spaces}
+          makeSpaces={makeSpaces}
           taskSpaces={taskSpaces}
           onOpenTask={id => selectTask(id)}
           onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}

@@ -11,7 +11,7 @@
  */
 import { isMine, useMineScope } from './mine-scope'
 import { setWorkWeekend } from '@/lib/utils'
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
 import type { Task } from '@/types/index'
@@ -75,7 +75,20 @@ export function BrandPage({ data, brandId, folder }: {
   const name = brand?.name ?? t('noBrand')
   const color = brand?.color ?? PIPE.textFaint
   // Spec 022: linked media tasks show through their content task, not as cards of their own.
-  const scope = useMemo(() => (task: Task) => (brandId ? task.brand_id === brandId : !task.brand_id) && !isLinkedMedia(task), [brandId])
+  // QA 26 Nov 2026 (F16, owner): a Brand page shows only tasks in Spaces you can open (admins: all), plus
+  // your own tasks wherever they are.
+  const me = data.currentUser
+  const openSpaces = useMemo(() => new Set(data.spaces.filter(sp => me.access === 'admin'
+    || (sp.settings as { visibility?: string } | null)?.visibility === 'everyone'
+    || data.spaceMembers.some(r => r.space_id === sp.id && r.member_id === me.id)).map(sp => sp.id)), [data.spaces, data.spaceMembers, me])
+  const spacesOfTask = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const r of data.taskSpaces) (m.get(r.task_id) ?? m.set(r.task_id, []).get(r.task_id)!).push(r.space_id)
+    return m
+  }, [data.taskSpaces])
+  const mayView = useCallback((task: Task) => me.access === 'admin' || task.task_owner_id === me.id || task.assignee_id === me.id || !!task.assignee_ids?.includes(me.id)
+    || (spacesOfTask.get(task.id) ?? []).some(id => openSpaces.has(id)), [me, openSpaces, spacesOfTask])
+  const scope = useMemo(() => (task: Task) => (brandId ? task.brand_id === brandId : !task.brand_id) && !isLinkedMedia(task) && mayView(task), [brandId, mayView])
   const all = viewTasks(data).filter(scope)
   const open = (id: string) => selectTask(id)
   // Spec 023: custom fields and their values, for List rows.

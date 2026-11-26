@@ -57,7 +57,7 @@ type Popup =
   | { kind: 'makeTask'; anchor: HTMLElement; rec: ContentRowRec }
   | { kind: 'addExisting'; anchor: HTMLElement }
 
-const KNOWN_ERRORS = ['board_tab', 'already_linked', 'not_linked_tab', 'parent_plain', 'not_a_subtask', 'is_a_subtask', 'not_in_space', 'needs_space', 'not_allowed_in_space', 'type_not_allowed', 'not_linked', 'child_rows_off', 'one_level', 'not_a_child', 'needs_destination', 'already_theme', 'theme_exists', 'theme_name_empty', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
+const KNOWN_ERRORS = ['changed_meanwhile', 'board_tab', 'already_linked', 'not_linked_tab', 'parent_plain', 'not_a_subtask', 'is_a_subtask', 'not_in_space', 'needs_space', 'not_allowed_in_space', 'type_not_allowed', 'not_linked', 'child_rows_off', 'one_level', 'not_a_child', 'needs_destination', 'already_theme', 'theme_exists', 'theme_name_empty', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
   'not_authorized', 'bad_link', 'not_found', 'dropped', 'not_authenticated', 'bad_date', 'generic']
 
 /** "2026-11-20", "20/11/2026" or "20/11" → YYYY-MM-DD; '' clears; null when unreadable. */
@@ -255,9 +255,8 @@ export function ContentSheet(p: ContentSheetProps) {
       { key: 'above', text: t('rows.insertAbove'), label: t('rows.insertAbove'), onSelect: pick(() => insertBeside(row, 'above')) },
       { key: 'below', text: t('rows.insertBelow'), label: t('rows.insertBelow'), onSelect: pick(() => insertBeside(row, 'below')) },
     ]
-    if (!rec.parent_id && editable) items.push({ key: 'child', text: t('rows.addChildItem'), label: t('rows.addChildItem'), onSelect: pick(() => addPiece((row as { theme: ContentTheme }).theme, rec.pillar_id, rec.id)) })
-    if (editable && !rec.parent_id && !childCount(rec.id)) items.push({ key: 'indent', text: t('rows.makeChild'), label: t('rows.makeChild'), onSelect: pick(() => void indent(rec, 'in')) })
-    if (editable && parent) items.push({ key: 'outdent', text: t('rows.moveOut'), label: t('rows.moveOut'), onSelect: pick(() => void indent(rec, 'out')) })
+    // QA 26 Nov 2026 (F18, owner): no child rows, so no "Add child row" or indenting.
+    void parent; void childCount
     // Spec 026: Make task (a new task in a chosen Space, or an existing one); Unlink keeps the row as plain text.
     if (!rec.task_id) {
       if (p.api.makeTask) items.push({ key: 'task', text: t('rows.makeTaskItem'), label: t('rows.makeTaskItem'), onSelect: () => openMakeTask(rec, anchor) })
@@ -281,6 +280,8 @@ export function ContentSheet(p: ContentSheetProps) {
   }
   /** Tab makes a row a child of the row above; Shift+Tab moves it back out (on the row's number). */
   function onRowKey(row: ContentRow, col: GridCol, e: React.KeyboardEvent): boolean {
+    // QA 26 Nov 2026 (F18): Tab moves to the next cell; rows aren't indented any more.
+    if (e.key === 'Tab') return false
     if (e.key !== 'Tab' || col !== 'rowNo' || !rowsOn) return false
     const rec = recOf(row)
     if (!rec) return false
@@ -321,8 +322,8 @@ export function ContentSheet(p: ContentSheetProps) {
       if (to.kind === 'add') { void p.api.moveRow(rec.id, { projectId: to.theme.id, pillarId: to.pillarId, parentId: to.parentId }).then(r => ok(r)); return }
       const target = recOf(to)
       if (!target) return
-      if (where === 'on') { void p.api.moveRow(rec.id, { projectId: target.project_id, parentId: target.id }).then(r => ok(r, t('rows.nested'))); return }
-      void p.api.moveRow(rec.id, { projectId: target.project_id, pillarId: target.pillar_id, parentId: target.parent_id, anchor: { id: target.id, where: where === 'before' ? 'above' : 'below' } }).then(r => ok(r))
+      // QA 26 Nov 2026 (F18): dropped on a row → placed just below it, never under it.
+      void p.api.moveRow(rec.id, { projectId: target.project_id, pillarId: target.pillar_id, parentId: null, anchor: { id: target.id, where: where === 'before' ? 'above' : 'below' } }).then(r => ok(r))
     },
   } : undefined
 
@@ -720,7 +721,7 @@ export function ContentSheet(p: ContentSheetProps) {
       {addMenu && (
         <SheetMenu anchor={addMenu} label={ts('view.moreAdd')} onClose={() => setAddMenu(null)}
           items={[
-            ...(admin ? [{ key: 'theme', text: t('addTheme'), label: t('addTheme'), onSelect: () => {
+            ...(admin && !p.noThemeAdd ? [{ key: 'theme', text: t('addTheme'), label: t('addTheme'), onSelect: () => {
               const el = addMenu; setAddMenu(null)
               if (rowsOn) { void openThemeAdd(el); return }
               setPopup({ kind: 'name', anchor: el, title: t('theme.newName'), save: async name => { const r = await p.api.addTheme(name); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null } })
@@ -936,7 +937,7 @@ export function ContentSheet(p: ContentSheetProps) {
         const parentTask = null
         return (
           <SheetPopover anchor={popup.anchor} label={t('rows.makeTask')} onClose={closePopup}>
-            <MakeTaskDialog title={popup.rec.title} spaces={(p.spaces ?? []).map(sp => ({ id: sp.id, name: sp.name }))} defaultSpaceId={p.space?.id ?? null}
+            <MakeTaskDialog title={popup.rec.title} spaces={p.makeSpaces ?? (p.spaces ?? []).map(sp => ({ id: sp.id, name: sp.name }))} defaultSpaceId={p.space?.id ?? null}
               tasks={p.tasks} taken={new Set(recs.map(r => r.task_id).filter((x): x is string => !!x))} parentTask={parentTask} taskSpaces={p.taskSpaces ?? []}
               onCancel={() => closePopup(true)}
               onMake={async o => { const r = await p.api.makeTask!(popup.rec.id, o); if (!r.success) return why(r.error); closePopup(true); say(o.taskId ? t('rows.linked') : t('rows.taskMade')); return null }} />

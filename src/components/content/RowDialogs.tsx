@@ -171,7 +171,8 @@ export function MakeTaskDialog({ title, spaces, defaultSpaceId, tasks, taken, pa
   onCancel(): void
 }) {
   const t = useTranslations('content')
-  const [spaceId, setSpaceId] = useState(defaultSpaceId ?? spaces[0]?.id ?? '')
+  // QA 26 Nov 2026 (F27): nothing preselected outside a Space — you choose (one choice is chosen for you).
+  const [spaceId, setSpaceId] = useState(defaultSpaceId ?? (spaces.length === 1 ? spaces[0].id : ''))
   const [mode, setMode] = useState<'new' | 'existing'>('new')
   const [q, setQ] = useState('')
   const [note, setNote] = useState<string | null>(null)
@@ -191,7 +192,8 @@ export function MakeTaskDialog({ title, spaces, defaultSpaceId, tasks, taken, pa
         ? <span className="fx-sheet-muted" data-make-subtask="">{t('rows.subtaskOf', { name: parentTask.name })}</span>
         : (
           <label className="fx-sheet-pop-title" style={{ fontWeight: 600 }}>{t('rows.inSpace')}
-            <select value={spaceId} onChange={e => setSpaceId(e.target.value)} data-make-space="">
+            <select value={spaceId} onChange={e => setSpaceId(e.target.value)} data-make-space="" required>
+              {!spaceId && <option value="" disabled>{t('rows.chooseSpace')}</option>}
               {spaces.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
             </select>
           </label>

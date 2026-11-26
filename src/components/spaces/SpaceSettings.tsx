@@ -276,7 +276,7 @@ export function SpaceSettingsPanel({ space, data, onClose }: { space: TeamSpace;
               </label>
             </div>
             <p style={hint}>{t('newOnly')}</p>
-            <label style={check}><input type="checkbox" checked={s.child_rows} data-child-rows onChange={e => set('child_rows', e.target.checked)} />{t('childRows')}</label>
+            {/* QA 26 Nov 2026 (F18): no child rows, so no switch for them. */}
           </>}
 
           {tab === 'panel' && <>

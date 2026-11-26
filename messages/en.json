@@ -857,7 +857,8 @@
       "discardAsk": "Close and lose the pasted rows and your fixes?",
       "keepEditing": "Keep editing",
       "discard": "Close without adding",
-      "open": "Paste plan"
+      "open": "Paste plan",
+      "date": "Date"
     },
     "problem": {
       "noTitle": "No title",
@@ -910,7 +911,8 @@
       "emptyName": "Type a name first.",
       "board_tab": "The Board tab is always linked.",
       "already_linked": "This tab is already linked.",
-      "not_linked_tab": "This tab isn’t linked."
+      "not_linked_tab": "This tab isn’t linked.",
+      "changed_meanwhile": "Someone changed this a moment ago, so your edit wasn't saved. You now see their version; edit it again to replace it."
     },
     "menu": {
       "next": "Next",
@@ -991,7 +993,8 @@
       "archiveTask": "Archive the task",
       "taskArchived": "Task archived",
       "addExisting": "+ Add existing task",
-      "addedExisting": "Task added to this tab"
+      "addedExisting": "Task added to this tab",
+      "chooseSpace": "Choose a Space"
     },
     "themes": {
       "addTitle": "Add a theme",
@@ -1439,7 +1442,8 @@
       "saved": "Saved",
       "retrying": "Not saved, retrying ({n})",
       "offline": "You're offline. Your edits stay here and save when the connection is back.",
-      "leave": "Some changes aren't saved yet. Leave anyway?"
+      "leave": "Some changes aren't saved yet. Leave anyway?",
+      "offlineQueue": "Offline — {n, plural, one {# edit} other {# edits}} will save when you're back"
     },
     "toolbar": {
       "undo": "Undo",
@@ -3356,7 +3360,7 @@
         "description": "Description",
         "below": "Fields below the Description",
         "fields": "Fields box",
-        "subtasks": "Subtasks",
+        "subtasks": "Related tasks",
         "attachments": "Attachments"
       },
       "moveUp": "Move {name} up",
@@ -4075,13 +4079,13 @@
     "failed": "Couldn't save the assignees."
   },
   "templates": {
-    "intro": "A template fills a new task of its type: the name, brief, priority, hours, who does it and its subtasks. Editing a template changes new tasks only.",
+    "intro": "A template fills a new task of its type: the name, brief, priority, hours, who does it, and the tasks made with it. Editing a template changes new tasks only.",
     "default": "Default for new tasks",
     "noDefault": "None",
     "new": "Template",
     "none": "No templates yet.",
     "isDefault": "Default",
-    "subtaskCount": "{n, plural, =0 {no subtasks} one {# subtask} other {# subtasks}}",
+    "subtaskCount": "{n, plural, =0 {no other tasks} one {# more task} other {# more tasks}}",
     "fieldCount": "{n, plural, one {# field value} other {# field values}}",
     "edit": "Edit",
     "delete": "Delete",
@@ -4095,15 +4099,15 @@
     "hours": "Hours",
     "patternHint": "Placeholders: '{Brand}', '{Type}', '{Month}', '{Date}' (the publishing date).",
     "brief": "Brief",
-    "subtasks": "Subtasks",
-    "subtaskName": "Subtask name",
+    "subtasks": "Tasks made with it",
+    "subtaskName": "Task name",
     "startOffset": "Start: days from the publishing date",
     "startShort": "Start",
     "dueOffset": "Due: days from the publishing date",
     "dueShort": "Due",
-    "removeSubtask": "Remove subtask",
+    "removeSubtask": "Remove task",
     "offsetHint": "Days from the publishing date: −10 is ten days before. Empty: no start date; the task's due date.",
-    "addSubtask": "Subtask",
+    "addSubtask": "Task",
     "save": "Save template",
     "cancel": "Cancel",
     "saved": "Saved.",

@@ -2363,46 +2363,8 @@ export function TaskModal({
                 )}
               </div>
 
-              {/* ── Subtasks + actions ───────────────────────────────────── */}
-              {/* Spec 021 (US4): a video's clips are hidden when its brand has Video clips off. */}
-              {(task.subtasks?.length ?? 0) > 0 && !(task.content_type_label === 'Video' && !on('clips')) && (
-                <div data-panel-section="subtasks" style={{ order: orderOf('subtasks'), marginTop: 20 }}>
-                  <h2 style={{ fontSize: 16.5, fontWeight: 600, color: CU.text, margin: '0 0 8px' }}>
-                    {/* Owner, 25 Nov 2026: no subtasks; what's left under a task are a video's clips. */}
-                    {task.content_type_label === 'Video' ? 'Clips' : 'Subtasks'} <span style={{ color: CU.faint, fontWeight: 500 }}>{task.subtasks!.length}</span>
-                  </h2>
-                  <div style={{ display: 'grid', gap: 4 }}>
-                    {task.subtasks!.map(s => {
-                      const meta = STAGE_META[s.status]
-                      return (
-                        <button key={s.id} type="button" onClick={() => selectTask(s.id)}
-                                className="fx-hov"
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                                  padding: '9px 10px', borderRadius: 12, cursor: 'pointer',
-                                  border: 'none', background: '#fff',
-                                  boxShadow: '0 1px 2px rgba(24,35,63,0.03)',
-                                  fontFamily: 'inherit', fontSize: 15, color: CU.text, textAlign: 'start',
-                                }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
-                          <span style={{
-                            flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            // A dropped clip (spec 008 FR-060): kept, greyed, struck through.
-                            ...(s.dropped_at ? { textDecoration: 'line-through', color: CU.faint } : {}),
-                          }}>
-                            {s.name}
-                          </span>
-                          <span style={{ fontSize: 13, color: CU.label, whiteSpace: 'nowrap' }}>
-                            {s.dropped_at ? tsheet('drop.droppedSr') : meta.label_en}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+              {/* QA 26 Nov 2026 (F26): no subtasks or clips under a task — theme › pillar › task. */}
 
-              {/* Owner, 25 Nov 2026: no "Add subtask" — every piece of work is a task of its own. */}
 
               {/* ── Attachments (spec 007) ─────────────────────────────── */}
               <div data-panel-section="attachments" style={{ order: orderOf('attachments') }}>

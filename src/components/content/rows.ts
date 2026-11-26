@@ -101,6 +101,8 @@ export function buildContentRows(tasks: Task[], themesIn: ContentTheme[], o: Con
     ? [...themesIn, { id: TAB_ROWS_ID, name: o.noThemeLabel ?? 'No theme', brand_id: null, owner_id: null, frequency_count: null, frequency_period: null, audience: [], pillars: [] } as ContentTheme]
     : themesIn
   if (o.tabRows && o.recs) o = { ...o, recs: o.recs.map(r => (r.project_id ? r : { ...r, project_id: TAB_ROWS_ID })) }
+  // QA 26 Nov 2026 (F18, owner): no child rows — rows nested before show flat, in order, under their theme and pillar.
+  if (o.recs?.some(r => r.parent_id)) o = { ...o, recs: o.recs.map(r => (r.parent_id ? { ...r, parent_id: null } : r)) }
   const rows: ContentRow[] = []
   const q = normQuery(o.query)
   let n = 1
