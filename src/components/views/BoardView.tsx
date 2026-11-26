@@ -11,7 +11,9 @@ import type { ContentTheme, Task } from '@/types/index'
 import type { BoardData } from './types'
 import { ShownFieldsProvider } from '@/components/fields/CardFields'
 
-export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetScope, themeScope, boardKey, fields }: {
+export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetScope, themeScope, boardKey, fields, defaultBrandId }: {
+  /** QA 26 Nov 2026 (F04): a Space › Brand folder's or Brand page's brand, for new tasks. */
+  defaultBrandId?: string | null
   /** Spec 023: what the page's Fields button shows on cards. */
   fields?: string[]
   /** Which board, for the member's saved sort. */
@@ -34,6 +36,7 @@ export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetSco
       sheetScope={sheetScope}
       themeScope={themeScope}
       boardKey={boardKey}
+      defaultBrandId={defaultBrandId}
     />
     </ShownFieldsProvider>
   )

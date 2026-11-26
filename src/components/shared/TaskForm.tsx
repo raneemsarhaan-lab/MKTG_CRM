@@ -52,6 +52,10 @@ const CU = {
  */
 
 interface TaskFormProps {
+  /** QA 26 Nov 2026 (F04): the brand to start with (a Space › Brand folder's, a Brand page's). */
+  defaultBrandId?: string | null
+  /** QA 26 Nov 2026 (F15): the form's title, the Space's own word for a new task. */
+  label?: string
   currentUser:  Member
   brands:       Brand[]
   contentTypes: ContentType[]
@@ -104,7 +108,7 @@ function Icon({ d, strokeWidth = 2 }: { d: string; strokeWidth?: number }) {
   )
 }
 
-export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [], spaceAssignees = {}, dueRule = DEFAULT_RULE }: TaskFormProps) {
+export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [], spaceAssignees = {}, dueRule = DEFAULT_RULE, defaultBrandId = null, label }: TaskFormProps) {
   const tDates = useTranslations('dates')
   const tPri = useTranslations('priority')
   const locale = useLocale()
@@ -129,7 +133,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
   const [form, setForm] = useState({
     name: '',
     description: '',
-    brand_id: brands[0]?.id ?? '',
+    // QA 26 Nov 2026 (F04): in a Space › Brand folder or on a Brand page, that brand is chosen already.
+    brand_id: (defaultBrandId && brands.some(b => b.id === defaultBrandId) ? defaultBrandId : brands[0]?.id) ?? '',
     content_type_label: contentTypes[0]?.label ?? 'Post',
     platform: 'LinkedIn' as typeof PLATFORMS[number],
     // The owner is whoever raises the task — they are accountable for it.
@@ -285,7 +290,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="New task"
+        aria-label={label ?? 'New task'}
         style={{
           background: '#fff', borderRadius: 16, width: '100%', maxWidth: 660,
           maxHeight: '90vh', display: 'flex', flexDirection: 'column',
@@ -301,8 +306,9 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
             fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 17,
             color: CU.ink, paddingBottom: 10, borderBottom: `2.5px solid ${CU.blue}`,
             marginBottom: -15,
-          }}>
-            Task
+          }} data-task-form-title="">
+            {/* QA 26 Nov 2026 (F15): the Space's own word ("New post", "New clip"). */}
+            {label ?? 'Task'}
           </span>
           <button
             onClick={close}

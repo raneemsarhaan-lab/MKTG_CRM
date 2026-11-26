@@ -126,6 +126,8 @@ interface KanbanBoardProps {
   themeScope?: (theme: ContentTheme) => boolean
   /** The one brand this sheet is narrowed to (a Space › Brand folder, a brand's page): new themes take it. */
   sheetBrandId?: string | null
+  /** QA 26 Nov 2026 (F04): the brand new tasks start with (else the sheet's brand). */
+  defaultBrandId?: string | null
   /** Fields (25 Nov 2026): custom fields promoted to Standard, and this person's own sheet columns per view. */
   standardFields?: string[]
   myLayouts?: Record<string, import('@/lib/sheet-columns').PersonalLayout>
@@ -202,6 +204,7 @@ function KanbanBoardInner({
   sheetScope,
   themeScope,
   sheetBrandId = null,
+  defaultBrandId = null,
   standardFields = [],
   myLayouts = {},
   taskFields: libraryFields = [],
@@ -948,7 +951,8 @@ function KanbanBoardInner({
         moveRow: run((id: string, to: Parameters<typeof contentRows.moveRow>[1]) => contentRows.moveRow(id, { ...to, projectId: noTheme(to.projectId) })),
         indentRow: run(contentRows.indentRow), deleteRow: run(contentRows.deleteRow), rowToTask: run(contentRows.rowToTask),
         linkRowTask: run(contentRows.linkRowTask),
-        makeTask: run(contentRows.makeTask), unlinkRow: run(contentRows.unlinkRow),
+        // QA 26 Nov 2026 (F04): a row made into a task in a brand folder or on a Brand page takes that brand.
+        makeTask: run((id: string, o: Parameters<typeof contentRows.makeTask>[1]) => contentRows.makeTask(id, { ...o, brandId: o?.brandId ?? sheetBrandId ?? null })), unlinkRow: run(contentRows.unlinkRow),
         reorderThemes: run((a: string, b: string, w: 'before' | 'after') => contentRows.reorderThemes(a, b, w, sheetSpaceRef.current, tabSheet?.id ?? null)),
         removeSheetTheme: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removeSheetTheme(a, d ? { ...d, projectId: noTheme(d.projectId) } : d, sheetSpaceRef.current, tabSheet?.id ?? null)),
         addPillarAt: run((a: string, n: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null) => contentRows.addPillarAt(a, n, anchor, sheetSpaceRef.current, tabSheet?.id ?? null)),
@@ -1352,6 +1356,8 @@ function KanbanBoardInner({
       contentTypes={typesForSpace(formSpace?.settings, contentTypes)}
       members={members}
       spaceId={spaceId ?? null}
+      defaultBrandId={defaultBrandId ?? sheetBrandId}
+      label={addLabel}
       spaceChoices={mySpaces.map(x => ({ id: x.id, name: x.name }))}
       spaceAssignees={Object.fromEntries(spaces.map(x => [x.id, defaultAssigneeFor(x, members, spaceMembers.filter(r => r.space_id === x.id).map(r => r.member_id))]))}
       dueRule={dueRule}

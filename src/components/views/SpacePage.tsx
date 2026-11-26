@@ -84,6 +84,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
   // The add form, on the tabs that don't carry a board of their own.
   const taskForm = showTaskForm && (
     <TaskForm currentUser={data.currentUser} brands={data.brands} contentTypes={typesForSpace(space.settings, data.contentTypes)} members={data.members}
+      defaultBrandId={folderBrand?.id ?? null} label={addLabel}
       spaceId={spaceId} spaceAssignees={{ [spaceId]: defaultAssigneeFor(space, data.members, memberIds) }} dueRule={data.dueRule} />
   )
 
@@ -142,7 +143,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         const shownTasks = view ? applyView(tasks, view.config, fv.valueOf) : tasks
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         const inView = ids ? (x: Task) => scope(x) && ids.has(x.id) : scope
-        if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={inView} spaceId={spaceId} />
+        if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={inView} spaceId={spaceId} defaultBrandId={folderBrand?.id ?? null} />
         // Spec 026: every Space's Sheet view is its sheet of rows — themes, pillars, plain and linked rows —
         // inside a full workbook (tabs, toolbar, formatting, comments, blank tabs). The Content and Video
         // Spaces keep the workbooks their sheets always had, so formatting and comments carry over.
