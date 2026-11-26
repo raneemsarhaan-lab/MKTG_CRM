@@ -73,22 +73,22 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
-      id: '027-us4-child-row-in-linked-tab-is-its-own-task', as: 'admin',
+      // QA 26 Nov 2026 (F18, owner): no child rows — theme › pillar › task. A row nested before shows flat.
+      id: '027-us4-no-child-rows-in-a-linked-tab', as: 'admin',
       async run({ page, go }) {
         const n = rnd(), tab = newTab(`Lab child ${n}`, true)
         const parentTask = task(`Lab parent ${n}`, null, null)
         const parent = row(tab, `Lab parent ${n}`, { task: parentTask })
+        const old = row(tab, `Lab old kid ${n}`, { parent })
         try {
           await openTab(page, go, tab)
-          await menu(page, `k:${parentTask}|rowNo`, 'Add child row')
-          await typeDraft(page, `Lab kid ${n}`)
+          await page.click(`[data-cell="k:${parentTask}|rowNo"]`)
+          await page.waitForSelector('[role="menuitem"]', { timeout: 10000 })
+          ok(!(await page.locator('[role="menuitem"]', { hasText: /child row/ }).count()), 'no "Add child row"')
           await page.keyboard.press('Escape')
-          const kid = psql(`select coalesce(task_id::text, '-') || '|' || coalesce(parent_id::text, '-') from content_rows where sheet_id='${tab}' and title='Lab kid ${n}'`)
-          const [kidTask, kidParent] = kid.split('|')
-          ok(kidParent === parent, 'the row is a child of its parent row')
-          ok(kidTask !== '-' && kidTask !== parentTask, 'in a linked tab it is a task')
-          ok(psql(`select coalesce(parent_task_id::text, 'none') from tasks where id='${kidTask}'`) === 'none', 'a task of its own, not a subtask')
-          ok(psql(`select count(*) from task_spaces where task_id='${kidTask}' and space_id='${space('content')}'`) === '1', 'on the Content board')
+          ok(await page.isVisible(`[data-row="l:${old}"]`), 'a row nested before still shows')
+          ok(!(await page.$('[data-add-row^="child:"]')), 'with no "+ Child row" line')
+          ok(psql(`select parent_id from content_rows where id='${old}'`) === parent, 'its stored data is unchanged')
         } finally { cleanup(tab, [], n) }
       },
     },

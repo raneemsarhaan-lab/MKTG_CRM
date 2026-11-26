@@ -240,7 +240,9 @@ export async function deleteRow(id: string, opts: { task?: 'unlink' | 'delete'; 
   if (!row) return { success: false, error: 'not_found' }
   if (!(await mayEditRow(row, m))) return { success: false, error: 'not_authorized' }
   const kids = await prisma.contentRow.findMany({ where: { parent_id: id }, orderBy: { position: 'asc' } })
-  if (kids.length && !opts.children) return { success: false, error: 'needs_children_choice' }
+  // QA 26 Nov 2026 (F18): rows nested before the change show flat, so the sheet no longer asks;
+  // their rows move up a level in its place (never deleted with it unless asked).
+  if (kids.length && !opts.children) opts = { ...opts, children: 'up' }
   const linked = [row, ...(opts.children === 'delete' ? kids : [])].filter(r => r.task_id)
   if (linked.length && !opts.task) return { success: false, error: 'needs_task_choice' }
   const taskIds = linked.map(r => r.task_id!)

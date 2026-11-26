@@ -101,7 +101,7 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
-      id: '2b-rows-pillars-children-and-tab', as: 'admin',
+      id: '2b-rows-pillars-and-no-child-rows', as: 'admin',
       async run({ page, go }) {
         const n = rnd(), th = theme(`Lab rows ${n}`, 0.1)
         try {
@@ -127,30 +127,22 @@ module.exports = (EMAIL, psql, ok) => {
           await page.keyboard.press('Enter')
           await page.waitForTimeout(1500)
           ok(psql(`select date::text from content_rows where id='${r1}'`) === '2026-12-20', 'a plain row keeps its date')
-          // Tab on Second's number: a child of First. Shift+Tab: back out.
+          // QA 26 Nov 2026 (F18, owner): no child rows. Tab on a row's number never nests it, and the
+          // row menu has no "Add child row".
           await page.click(`[data-cell="l:${r2}|rowNo"]`)
           await page.keyboard.press('Escape')
           await page.keyboard.press('Tab')
           await page.waitForTimeout(2000)
-          ok(psql(`select parent_id from content_rows where id='${r2}'`) === r1, 'Tab: a child of the row above')
-          ok(await page.isVisible(`[data-add-row="child:${r1}"]`), 'its own "+ Child row" line')
-          // One level only: First can't go under anything, and a child can't take children.
+          ok(psql(`select coalesce(parent_id::text, 'top') from content_rows where id='${r2}'`) === 'top', 'Tab does not make a child row')
           await page.click(`[data-cell="l:${r2}|rowNo"]`)
-          ok(!(await page.locator('[role="menuitem"]', { hasText: 'Add child row' }).count()), 'a child row has no "Add child row"')
+          await page.waitForSelector('[role="menuitem"]', { timeout: 10000 })
+          ok(!(await page.locator('[role="menuitem"]', { hasText: /child row|Make it a child|Move out/ }).count()), 'no "Add child row" in the row menu')
           await page.keyboard.press('Escape')
-          await page.keyboard.press('Shift+Tab')
-          await page.waitForTimeout(2000)
-          ok(psql(`select parent_id from content_rows where id='${r2}'`) === '', 'Shift+Tab: out again')
           // Insert row above, from the row menu.
           await menu(page, `l:${r1}|rowNo`, 'Insert row above')
           await typeDraft(page, `Zero ${n}`)
           await page.keyboard.press('Escape')
           ok(Number(psql(`select position from content_rows where title='Zero ${n}'`)) < Number(psql(`select position from content_rows where id='${r1}'`)), 'inserted above')
-          // Add child row from the menu.
-          await menu(page, `l:${r1}|rowNo`, 'Add child row')
-          await typeDraft(page, `Kid ${n}`)
-          await page.keyboard.press('Escape')
-          ok(psql(`select parent_id from content_rows where title='Kid ${n}'`) === r1, 'Add child row makes a child')
         } finally { cleanup([th]) }
       },
     },
@@ -179,10 +171,10 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForTimeout(2500)
           ok(psql(`select project_id || '|' || pillar_id from content_rows where id='${lr}'`) === `${b}|${plB}`, 'the row moved to B › PB')
           ok(psql(`select project_id || '|' || pillar_id from tasks where id='${t}'`) === `${b}|${plB}`, "its task's theme and pillar match")
-          // Drag a row onto another row (its middle): a child.
+          // QA 26 Nov 2026 (F18): a row dropped onto another lands beside it, never under it.
           await page.dragAndDrop(`[data-cell="l:${other}|rowNo"]`, `[data-row="k:${made}"]`)
           await page.waitForTimeout(2500)
-          ok(psql(`select parent_id from content_rows where id='${other}'`) === plain, 'dropped on a row: its child')
+          ok(psql(`select coalesce(parent_id::text, 'top') from content_rows where id='${other}'`) === 'top', 'dropped on a row: not nested')
           // Reorder themes by dragging (the sheet only).
           await page.dragAndDrop(`[data-cell="t:${b}|rowNo"]`, `[data-row="t:${a}"]`, { targetPosition: { x: 20, y: 2 } })
           await page.waitForTimeout(2500)

@@ -77,7 +77,12 @@ module.exports = (EMAIL, psql, ok) => {
         const b = firstBrand()
         await go(`/brands/${b}?view=list`)
         // Spec 022: linked media tasks show through their content task.
-        const want = psql(`select count(*) from tasks where brand_id='${b}' and dropped_at is null and content_task_id is null`)
+        // QA 26 Nov 2026 (F16): only tasks in Spaces the person can open, or their own.
+        const me = psql(`select id from members where email like 'content@%'`)
+        const want = psql(`select count(*) from tasks t where t.brand_id='${b}' and t.dropped_at is null and t.content_task_id is null and (
+          t.task_owner_id='${me}' or t.assignee_id='${me}' or exists (select 1 from task_assignees a where a.task_id=t.id and a.member_id='${me}')
+          or exists (select 1 from task_spaces ts join team_spaces sp on sp.id=ts.space_id where ts.task_id=t.id and (
+            coalesce(sp.settings->>'visibility', 'members')='everyone' or exists (select 1 from team_space_members sm where sm.space_id=sp.id and sm.member_id='${me}'))))`)
         const rows = await page.$$eval('[data-list-view] [data-row]', els => els.length)
         ok(String(rows) === want, `brand lists its tasks: ${rows} vs ${want}`)
         ok((await go('/brands/not-a-brand')).status() === 404, 'unknown brand is 404')

@@ -37,7 +37,6 @@ import { ROWS_COMMAND, openAddColumn, type RowsCommand } from '@/components/shee
 import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
 import { useMoveError, type MoveRefusal } from '@/components/fields/moveErrors'
 import type { ContentRowRec } from '@/lib/content-rows'
-import { mayNest } from '@/lib/content-rows'
 import { ThemeAdd, DestinationPick, DeleteRowPrompt, LinkTaskPick, MakeTaskDialog, destinations } from './RowDialogs'
 import type { ContentDraft } from './rows'
 
@@ -228,10 +227,6 @@ export function ContentSheet(p: ContentSheetProps) {
 
   // ── sheet 2b: rows, themes and pillars ───────────────────────────────────
   const ok = (r: { success: boolean; error?: string }, done?: string) => { if (!r.success) { say(t('notSaved', { reason: why(r.error) })); return false } if (done) say(done); return true }
-  async function indent(rec: ContentRowRec, dir: 'in' | 'out') {
-    if (!p.api.indentRow) return
-    ok(await p.api.indentRow(rec.id, dir), dir === 'in' ? t('rows.indented') : t('rows.outdented'))
-  }
   async function openThemeAdd(anchor: HTMLElement, at: { projectId: string; where: 'above' | 'below' } | null = null) {
     const names = (await p.api.themeNames?.().catch(() => [])) ?? []
     setPopup({ kind: 'themeAdd', anchor, at, names })
@@ -250,13 +245,11 @@ export function ContentSheet(p: ContentSheetProps) {
     if (!rowsOn || !rec) return []
     const pick = (fn: () => void) => () => { closePopup(true); fn() }
     const editable = canEditRec(rec)
-    const parent = rec.parent_id ? recs.find(r => r.id === rec.parent_id) : null
     const items: MenuItem[] = [
       { key: 'above', text: t('rows.insertAbove'), label: t('rows.insertAbove'), onSelect: pick(() => insertBeside(row, 'above')) },
       { key: 'below', text: t('rows.insertBelow'), label: t('rows.insertBelow'), onSelect: pick(() => insertBeside(row, 'below')) },
     ]
     // QA 26 Nov 2026 (F18, owner): no child rows, so no "Add child row" or indenting.
-    void parent; void childCount
     // Spec 026: Make task (a new task in a chosen Space, or an existing one); Unlink keeps the row as plain text.
     if (!rec.task_id) {
       if (p.api.makeTask) items.push({ key: 'task', text: t('rows.makeTaskItem'), label: t('rows.makeTaskItem'), onSelect: () => openMakeTask(rec, anchor) })
@@ -278,17 +271,6 @@ export function ContentSheet(p: ContentSheetProps) {
     if (editable && !(p.boardTasks && rec.task_id)) items.push({ key: 'delete', text: t('rows.delete'), label: t('rows.delete'), tone: 'danger', onSelect: () => askDelete(rec, row.kind === 'piece' ? row.task.name : rec.title, anchor) })
     return items
   }
-  /** Tab makes a row a child of the row above; Shift+Tab moves it back out (on the row's number). */
-  function onRowKey(row: ContentRow, col: GridCol, e: React.KeyboardEvent): boolean {
-    // QA 26 Nov 2026 (F18): Tab moves to the next cell; rows aren't indented any more.
-    if (e.key === 'Tab') return false
-    if (e.key !== 'Tab' || col !== 'rowNo' || !rowsOn) return false
-    const rec = recOf(row)
-    if (!rec) return false
-    if (!canEditRec(rec)) { onNote(`${row.key}|rowNo`, t('readOnly')); return true }
-    void indent(rec, e.shiftKey ? 'out' : 'in')
-    return true
-  }
   type Where = 'before' | 'after' | 'on'
   const rowDrag = rowsOn ? {
     can: (row: ContentRow) => {
@@ -308,9 +290,8 @@ export function ContentSheet(p: ContentSheetProps) {
       if (to.kind === 'add') return where === 'before'
       const target = recOf(to)
       if (!target || target.id === rec.id) return false
-      if (where === 'on') return mayNest(recs, rec, target)
-      // Between rows: a parent can't land among children (one level).
-      return !(target.parent_id && childCount(rec.id))
+      // QA 26 Nov 2026 (F18): dropped on or between rows, it lands beside them (never nested).
+      return true
     },
     drop: (from: ContentRow, to: ContentRow, where: Where) => {
       if (from.kind === 'theme' && to.kind === 'theme') { void p.api.reorderThemes?.(from.theme.id, to.theme.id, where === 'before' ? 'before' : 'after').then(r => ok(r, t('themes.moved'))); return }
@@ -788,7 +769,6 @@ export function ContentSheet(p: ContentSheetProps) {
               onAddPiece={addPiece}
               onAddRow={row => addPiece(row.theme, row.pillarId, row.parentId)}
               canEditLine={canEditRec}
-              onRowKey={onRowKey}
               rowDrag={rowDrag}
               onDelete={(row, anchor) => {
                 if (row.kind === 'line') { if (canEditRec(row.rec)) askDelete(row.rec, row.rec.title, anchor); return }
